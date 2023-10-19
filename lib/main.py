@@ -36,10 +36,7 @@ def get_youtube_video_id(url, ignore_playlist=True):
     """
     query = urlparse(url)
     if query.hostname == 'youtu.be':
-        if query.path[1:] == 'watch':
-            return query.query[2:]
-        return query.path[1:]
-
+        return query.query[2:] if query.path[1:] == 'watch' else query.path[1:]
     if query.hostname in {'www.youtube.com', 'youtube.com', 'music.youtube.com'}:
         if not ignore_playlist:
             # use case: get playlist id not current video in playlist
@@ -88,11 +85,11 @@ def get_rvc_model(voice_model, is_webui):
     model_dir = os.path.join(rvc_models_dir, voice_model)
     for file in os.listdir(model_dir):
         ext = os.path.splitext(file)[1]
-        if ext == '.pth':
-            rvc_model_filename = file
         if ext == '.index':
             rvc_index_filename = file
 
+        elif ext == '.pth':
+            rvc_model_filename = file
     if rvc_model_filename is None:
         error_msg = f'No model file exists in {model_dir}.'
         raise_exception(error_msg, is_webui)
@@ -123,14 +120,12 @@ def get_audio_paths(song_dir):
 def convert_to_stereo(audio_path):
     wave, sr = librosa.load(audio_path, mono=False, sr=44100)
 
-    # check if mono
-    if type(wave[0]) != np.ndarray:
-        stereo_path = f'{os.path.splitext(audio_path)[0]}_stereo.wav'
-        command = shlex.split(f'ffmpeg -y -loglevel error -i "{audio_path}" -ac 2 -f wav "{stereo_path}"')
-        subprocess.run(command)
-        return stereo_path
-    else:
+    if type(wave[0]) == np.ndarray:
         return audio_path
+    stereo_path = f'{os.path.splitext(audio_path)[0]}_stereo.wav'
+    command = shlex.split(f'ffmpeg -y -loglevel error -i "{audio_path}" -ac 2 -f wav "{stereo_path}"')
+    subprocess.run(command)
+    return stereo_path
 
 
 def get_hash(filepath):

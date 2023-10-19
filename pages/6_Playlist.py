@@ -22,8 +22,7 @@ if CWD not in sys.path:
     sys.path.append(CWD)
 
 def get_models(folder="."):
-    fnames = get_filenames(root="./models",folder=folder,exts=["pth","pt"])
-    return fnames
+    return get_filenames(root="./models",folder=folder,exts=["pth","pt"])
 
 def init_inference_state():
     state = SimpleNamespace(
@@ -97,7 +96,7 @@ if __name__=="__main__":
             format_func=lambda option: os.path.basename(option).split(".")[0],
             disabled=state.player is not None
             )
-        
+
         with st.form("song.settings.form"):
             state.volume = st.select_slider("Volume",options=np.linspace(0.,1.,21),value=state.volume,
                                             format_func=lambda x:f"{x*100:3.0f}%")
@@ -109,7 +108,7 @@ if __name__=="__main__":
                 disabled=not config.has_gpu,
                 options=DEVICE_OPTIONS,horizontal=True,
                 index=get_index(DEVICE_OPTIONS,state.device))
-            
+
             if st.form_submit_button("Update"):
                 set_volume(state)
                 set_loop(state)
@@ -121,8 +120,15 @@ if __name__=="__main__":
             state = refresh_data(state)
             st.experimental_rerun()
 
-        if col2.button("Play" if state.player is None else ("Resume" if state.player.paused else "Pause"), type="primary",use_container_width=True,
-                    disabled=not (state.split_vocal_config.model_paths and state.model_name)):
+        if col2.button(
+            "Play"
+            if state.player is None
+            else ("Resume" if state.player.paused else "Pause"),
+            type="primary",
+            use_container_width=True,
+            disabled=not state.split_vocal_config.model_paths
+            or not state.model_name,
+        ):
             if state.player is None:
                 state.player = PlaylistPlayer(state.playlist,
                                               shuffle=state.shuffle,
@@ -133,11 +139,10 @@ if __name__=="__main__":
                                                 device=state.device,
                                                 split_audio_params=vars(state.split_vocal_config),
                                                 vc_single_params=vars(state.vocal_change_config))
+            elif state.player.paused:
+                state.player.resume()
             else:
-                if state.player.paused:
-                    state.player.resume()
-                else:
-                    state.player.pause()
+                state.player.pause()
             st.experimental_rerun()
 
         if col3.button("Next", use_container_width=True,disabled = state.player is None):
@@ -149,8 +154,8 @@ if __name__=="__main__":
             state.player = None
             gc_collect()
             st.experimental_rerun()
-            
-        with st.expander("Settings", expanded=not (state.player and len(state.split_vocal_config.model_paths))):
+
+        with st.expander("Settings", expanded=not state.player or not len(state.split_vocal_config.model_paths)):
             vs_tab, vc_tab = st.tabs(["Split Vocal", "Vocal Change"])
 
             with vs_tab:

@@ -15,10 +15,7 @@ __all__ = ['time_stretch', 'pitch_shift']
 
 __RUBBERBAND_UTIL = os.path.join(BASE_PATH_RUB, 'rubberband')
 
-if six.PY2:
-    DEVNULL = open(os.devnull, 'w')
-else:
-    DEVNULL = subprocess.DEVNULL
+DEVNULL = open(os.devnull, 'w') if six.PY2 else subprocess.DEVNULL
 
 def __rubberband(y, sr, **kwargs):
 
@@ -38,9 +35,7 @@ def __rubberband(y, sr, **kwargs):
         arguments = [__RUBBERBAND_UTIL, '-q']
 
         for key, value in six.iteritems(kwargs):
-            arguments.append(str(key))
-            arguments.append(str(value))
-
+            arguments.extend((str(key), str(value)))
         arguments.extend([infile, outfile])
 
         subprocess.check_call(arguments, stdout=DEVNULL, stderr=DEVNULL)

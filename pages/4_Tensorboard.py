@@ -63,8 +63,7 @@ if CWD not in sys.path:
     
 def start_tensorboard(logdir, host="localhost"):
     cmd = f"tensorboard --logdir={logdir} --host={host}"
-    p = subprocess.Popen(cmd, shell=True, cwd=CWD)
-    return p
+    return subprocess.Popen(cmd, shell=True, cwd=CWD)
 
 if __name__=="__main__":
     with SessionStateContext("tensorboard") as state:
@@ -72,7 +71,10 @@ if __name__=="__main__":
         if state.url:
             st_tensorboard(url="http://localhost:6006")
         placeholder = st.container()
-        tensorboard_is_active = any(["tensorboard" in p.name() for p in psutil.Process(os.getpid()).children(recursive=True)])
+        tensorboard_is_active = any(
+            "tensorboard" in p.name()
+            for p in psutil.Process(os.getpid()).children(recursive=True)
+        )
         state.logdir=st.text_input("Path to Logs",value=state.logdir if state.logdir else os.path.join(CWD,"logs"))
         state.remote_bind = st.checkbox("Bind to 0.0.0.0(Required for docker or remote connections)", value=state.remote_bind if state.remote_bind else False)
         if st.button("Start Tensorboard", disabled=tensorboard_is_active):

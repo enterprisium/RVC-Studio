@@ -116,8 +116,10 @@ def sizeof_fmt(num: float, suffix: str = 'B'):
 def temp_filenames(count: int, delete=True):
     names = []
     try:
-        for _ in range(count):
-            names.append(tempfile.NamedTemporaryFile(delete=False).name)
+        names.extend(
+            tempfile.NamedTemporaryFile(delete=False).name
+            for _ in range(count)
+        )
         yield names
     finally:
         if delete:
@@ -224,9 +226,8 @@ class TensorChunk:
 def tensor_chunk(tensor_or_chunk):
     if isinstance(tensor_or_chunk, TensorChunk):
         return tensor_or_chunk
-    else:
-        assert isinstance(tensor_or_chunk, th.Tensor)
-        return TensorChunk(tensor_or_chunk)
+    assert isinstance(tensor_or_chunk, th.Tensor)
+    return TensorChunk(tensor_or_chunk)
 
 
 def apply_model_v1(model, mix, shifts=None, split=False, progress=False, set_progress_bar=None):
@@ -245,16 +246,16 @@ def apply_model_v1(model, mix, shifts=None, split=False, progress=False, set_pro
     """
 
     channels, length = mix.size()
-    device = mix.device
-    progress_value = 0
-    
     if split:
+        device = mix.device
         out = th.zeros(4, channels, length, device=device)
         shift = model.samplerate * 10
         offsets = range(0, length, shift)
-        scale = 10
         if progress:
+            scale = 10
             offsets = tqdm.tqdm(offsets, unit_scale=scale, ncols=120, unit='seconds')
+        progress_value = 0
+
         for offset in offsets:
             chunk = mix[..., offset:offset + shift]
             if set_progress_bar:
@@ -290,7 +291,7 @@ def apply_model_v1(model, mix, shifts=None, split=False, progress=False, set_pro
         return center_trim(out, mix)
 
 def apply_model_v2(model, mix, shifts=None, split=False,
-                overlap=0.25, transition_power=1., progress=False, set_progress_bar=None): 
+                overlap=0.25, transition_power=1., progress=False, set_progress_bar=None):
     """
     Apply model to a given mixture.
 
@@ -306,11 +307,11 @@ def apply_model_v2(model, mix, shifts=None, split=False,
     """
     
     assert transition_power >= 1, "transition_power < 1 leads to weird behavior."
-    device = mix.device
     channels, length = mix.shape
     progress_value = 0
-    
+
     if split:
+        device = mix.device
         out = th.zeros(len(model.sources), channels, length, device=device)
         sum_weight = th.zeros(length, device=device)
         segment = model.segment_length
@@ -351,7 +352,7 @@ def apply_model_v2(model, mix, shifts=None, split=False,
         for _ in range(shifts):
             offset = random.randint(0, max_shift)
             shifted = TensorChunk(padded_mix, offset, length + max_shift - offset)
-            
+
             if set_progress_bar:
                 progress_value += 1
                 shifted_out = apply_model_v2(model, shifted, set_progress_bar=set_progress_bar)
@@ -373,8 +374,10 @@ def apply_model_v2(model, mix, shifts=None, split=False,
 def temp_filenames(count, delete=True):
     names = []
     try:
-        for _ in range(count):
-            names.append(tempfile.NamedTemporaryFile(delete=False).name)
+        names.extend(
+            tempfile.NamedTemporaryFile(delete=False).name
+            for _ in range(count)
+        )
         yield names
     finally:
         if delete:
@@ -405,16 +408,13 @@ def load_model(path, strict=False):
     args = package["args"]
     kwargs = package["kwargs"]
 
-    if strict:
-        model = klass(*args, **kwargs)
-    else:
+    if not strict:
         sig = inspect.signature(klass)
         for key in list(kwargs):
             if key not in sig.parameters:
-                warnings.warn("Dropping inexistant parameter " + key)
+                warnings.warn(f"Dropping inexistant parameter {key}")
                 del kwargs[key]
-        model = klass(*args, **kwargs)
-
+    model = klass(*args, **kwargs)
     state = package["state"]
     training_args = package["training_args"]
     quantizer = get_quantizer(model, training_args)
@@ -450,7 +450,7 @@ def save_state(state, path):
     th.save(state, buf)
     sig = hashlib.sha256(buf.getvalue()).hexdigest()[:8]
 
-    path = path.parent / (path.stem + "-" + sig + path.suffix)
+    path = path.parent / f"{path.stem}-{sig}{path.suffix}"
     path.write_bytes(buf.getvalue())
 
 

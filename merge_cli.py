@@ -49,15 +49,14 @@ def get_scales(N):
     return s
         
 def safetensors_load(ckpt, map_location="cpu"):
-    sd = {}
     name, extension = os.path.splitext(ckpt)
-    if extension.lower() == ".safetensors":
-        with safe_open(ckpt, framework="pt", device=map_location) as f:
-            for key in f.keys():
-                sd[key] = f.get_tensor(key)
-        return {'state_dict': sd},os.path.basename(name)
-    else:
+    if extension.lower() != ".safetensors":
         return torch.load(ckpt, map_location=torch.device(map_location)),os.path.basename(name)
+    sd = {}
+    with safe_open(ckpt, framework="pt", device=map_location) as f:
+        for key in f.keys():
+            sd[key] = f.get_tensor(key)
+    return {'state_dict': sd},os.path.basename(name)
     
 def loadModelWeights(mPath):
     model,name = safetensors_load(mPath, map_location=args.device)

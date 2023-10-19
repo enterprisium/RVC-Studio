@@ -51,16 +51,13 @@ def load_model(path_or_package, strict=False):
     args = package["args"]
     kwargs = package["kwargs"]
 
-    if strict:
-        model = klass(*args, **kwargs)
-    else:
+    if not strict:
         sig = inspect.signature(klass)
         for key in list(kwargs):
             if key not in sig.parameters:
-                warnings.warn("Dropping inexistant parameter " + key)
+                warnings.warn(f"Dropping inexistant parameter {key}")
                 del kwargs[key]
-        model = klass(*args, **kwargs)
-
+    model = klass(*args, **kwargs)
     state = package["state"]
 
     set_state(model, state)
@@ -99,7 +96,7 @@ def save_with_checksum(content, path):
     torch.save(content, buf)
     sig = hashlib.sha256(buf.getvalue()).hexdigest()[:8]
 
-    path = path.parent / (path.stem + "-" + sig + path.suffix)
+    path = path.parent / f"{path.stem}-{sig}{path.suffix}"
     path.write_bytes(buf.getvalue())
 
 

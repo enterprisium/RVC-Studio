@@ -49,20 +49,21 @@ def train_model(exp_dir,if_f0,spk_id,version,sr,gpus,batch_size,total_epoch,save
         feature_dir = os.sep.join([model_log_dir,"3_feature256" if version == "v1" else "3_feature768"])
         os.makedirs(gt_wavs_dir, exist_ok=True)
         os.makedirs(feature_dir, exist_ok=True)
-        
+
         if if_f0:
             f0_dir =  os.sep.join([model_log_dir,"2a_f0"])
             f0nsf_dir = os.sep.join([model_log_dir,"2b-f0nsf"])
             names = (
-                set([name.split(".")[0] for name in os.listdir(gt_wavs_dir)])
-                & set([name.split(".")[0] for name in os.listdir(feature_dir)])
-                & set([name.split(".")[0] for name in os.listdir(f0_dir)])
-                & set([name.split(".")[0] for name in os.listdir(f0nsf_dir)])
-            )
+                (
+                    {name.split(".")[0] for name in os.listdir(gt_wavs_dir)}
+                    & {name.split(".")[0] for name in os.listdir(feature_dir)}
+                )
+                & {name.split(".")[0] for name in os.listdir(f0_dir)}
+            ) & {name.split(".")[0] for name in os.listdir(f0nsf_dir)}
         else:
-            names = set([name.split(".")[0] for name in os.listdir(gt_wavs_dir)]) & set(
-                [name.split(".")[0] for name in os.listdir(feature_dir)]
-            )
+            names = {
+                name.split(".")[0] for name in os.listdir(gt_wavs_dir)
+            } & {name.split(".")[0] for name in os.listdir(feature_dir)}
         opt = []
         for name in names:
             if if_f0:
@@ -92,24 +93,21 @@ def train_model(exp_dir,if_f0,spk_id,version,sr,gpus,batch_size,total_epoch,save
                     )
                 )
         fea_dim = 256 if version == "v1" else 768
-        if if_f0:
-            for _ in range(2):
+        for _ in range(2):
+            if if_f0:
                 opt.append(
-                    "%s/logs/mute/0_gt_wavs/mute%s.wav|%s/logs/mute/3_feature%s/mute.npy|%s/logs/mute/2a_f0/mute.wav.npy|%s/logs/mute/2b-f0nsf/mute.wav.npy|%s"
-                    % (CWD, sr, CWD, fea_dim, CWD, CWD, spk_id)
+                    f"{CWD}/logs/mute/0_gt_wavs/mute{sr}.wav|{CWD}/logs/mute/3_feature{fea_dim}/mute.npy|{CWD}/logs/mute/2a_f0/mute.wav.npy|{CWD}/logs/mute/2b-f0nsf/mute.wav.npy|{spk_id}"
                 )
-        else:
-            for _ in range(2):
+            else:
                 opt.append(
-                    "%s/logs/mute/0_gt_wavs/mute%s.wav|%s/logs/mute/3_feature%s/mute.npy|%s"
-                    % (CWD, sr, CWD, fea_dim, spk_id)
+                    f"{CWD}/logs/mute/0_gt_wavs/mute{sr}.wav|{CWD}/logs/mute/3_feature{fea_dim}/mute.npy|{spk_id}"
                 )
         shuffle(opt)
-        with open("%s/filelist.txt" % model_log_dir, "w") as f:
+        with open(f"{model_log_dir}/filelist.txt", "w") as f:
             f.write("\n".join(opt))
         print("write filelist done")
 
-        
+
         cmd = " ".join(str(i) for i in [
             config.python_cmd,
             'training_cli.py -e', f"{exp_dir}_{version}_{sr}",
@@ -127,7 +125,7 @@ def train_model(exp_dir,if_f0,spk_id,version,sr,gpus,batch_size,total_epoch,save
             "-sw", 1 if if_save_every_weights else 0,
             "-v", version
         ])
-        
+
         p = subprocess.Popen(cmd, shell=True, cwd=CWD, stderr=subprocess.PIPE)
 
         return f"Successfully started training. View your process under Active Processes: {p}"
@@ -164,12 +162,14 @@ def train_index(exp_dir,version,sr):
                 .cluster_centers_
             )
 
-        np.save("%s/total_fea.npy" % model_log_dir, big_npy)
+        np.save(f"{model_log_dir}/total_fea.npy", big_npy)
 
         # n_ivf =  big_npy.shape[0] // 39
         n_ivf = min(int(16 * np.sqrt(big_npy.shape[0])), big_npy.shape[0] // 39)
-        print("%s,%s" % (big_npy.shape, n_ivf))
-        index = faiss.index_factory(256 if version == "v1" else 768, "IVF%s,Flat" % n_ivf)
+        print(f"{big_npy.shape},{n_ivf}")
+        index = faiss.index_factory(
+            256 if version == "v1" else 768, f"IVF{n_ivf},Flat"
+        )
         print("training index")
         index_ivf = faiss.extract_index_ivf(index)  #
         index_ivf.nprobe = 1
@@ -182,7 +182,7 @@ def train_index(exp_dir,version,sr):
 
         index_name = os.path.join(BASE_MODELS_DIR,"RVC",".index",f"{exp_dir}_{version}_{sr}.index")
         faiss.write_index(index,index_name)
-        
+
         return f"saved index file to {index_name}"
     except Exception as e:
         return f"Failed to train index: {e}"
@@ -295,7 +295,7 @@ if __name__=="__main__":
             disabled = not (state.exp_dir and os.path.exists(os.path.join(CWD,"logs",model_log_dir,"1_16k_wavs")))
             if st.form_submit_button(i18n("training.extract_features.submit"),disabled=disabled):
                 st.toast(extract_features(state.exp_dir, state.n_threads, state.version, state.if_f0, state.f0method, state.device,state.sr))
-            
+
         with st.form(i18n("training.train_model.form")):  #def train_model(exp_dir,if_f0,spk_id,version,sr,gpus,batch_size,total_epoch,save_epoch,pretrained_G,pretrained_D,if_save_latest,if_cache_gpu,if_save_every_weights):
             st.subheader(i18n("training.train_model.title"))
             st.write(i18n("training.train_model.text"))
@@ -309,7 +309,7 @@ if __name__=="__main__":
             state.if_save_latest=st.checkbox(i18n("training.if_save_latest"),value=state.if_save_latest)
             state.if_cache_gpu=st.checkbox(i18n("training.if_cache_gpu"),value=state.if_cache_gpu)
             state.if_save_every_weights=st.checkbox(i18n("training.if_save_every_weights"),value=state.if_save_every_weights)
-            
+
             disabled = not (state.exp_dir and os.path.exists(os.path.join(CWD,"logs",model_log_dir,"3_feature768")))
             if st.form_submit_button(i18n("training.train_model.submit"),disabled=disabled):
                 st.toast(train_model(state.exp_dir, state.if_f0, state.spk_id, state.version,state.sr,
@@ -325,6 +325,7 @@ if __name__=="__main__":
             disabled = not (state.exp_dir and os.path.exists(os.path.join(CWD,"logs",model_log_dir)))
             if st.button(i18n("training.train_speaker.submit"),disabled=disabled):
                 st.toast(train_speaker_embedding(state.exp_dir,model_log_dir))
-            else: st.markdown(f"*Only required for speecht5 TTS*")
+            else:else
+                st.markdown("*Only required for speecht5 TTS*")
 
         active_subprocess_list()

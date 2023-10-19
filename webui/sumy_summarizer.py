@@ -14,9 +14,7 @@ print(f"loaded {__name__}")
 def get_summary(text: str, num_sentences: int=3):
     
     try:
-        results = summarize_text(text,num_sentences,type)
-
-        return results
+        return summarize_text(text,num_sentences,type)
     except Exception as e:
         print(e)
         return str(e)

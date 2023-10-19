@@ -30,8 +30,8 @@ class Preprocess:
         self.max = 0.9
         self.alpha = 0.75
         self.exp_dir = exp_dir
-        self.gt_wavs_dir = "%s/0_gt_wavs" % exp_dir
-        self.wavs16k_dir = "%s/1_16k_wavs" % exp_dir
+        self.gt_wavs_dir = f"{exp_dir}/0_gt_wavs"
+        self.wavs16k_dir = f"{exp_dir}/1_16k_wavs"
         self.noparallel = noparallel
         os.makedirs(self.exp_dir, exist_ok=True)
         os.makedirs(self.gt_wavs_dir, exist_ok=True)
@@ -40,7 +40,7 @@ class Preprocess:
     def println(self,strr):
         # mutex.acquire()
         print(strr)
-        with open("%s/preprocess.log" % self.exp_dir, "a+") as f:
+        with open(f"{self.exp_dir}/preprocess.log", "a+") as f:
             f.write("%s\n" % strr)
             f.flush()
         # mutex.release()
@@ -48,13 +48,13 @@ class Preprocess:
     def norm_write(self, tmp_audio, idx0, idx1):
         tmp_max = np.abs(tmp_audio).max()
         if tmp_max > 2.5:
-            print("%s-%s-%s-filtered" % (idx0, idx1, tmp_max))
+            print(f"{idx0}-{idx1}-{tmp_max}-filtered")
             return
         tmp_audio = (tmp_audio / tmp_max * (self.max * self.alpha)) + (
             1 - self.alpha
         ) * tmp_audio
         wavfile.write(
-            "%s/%s_%s.wav" % (self.gt_wavs_dir, idx0, idx1),
+            f"{self.gt_wavs_dir}/{idx0}_{idx1}.wav",
             self.sr,
             tmp_audio.astype(np.float32),
         )
@@ -62,7 +62,7 @@ class Preprocess:
             tmp_audio, orig_sr=self.sr, target_sr=16000
         )  # , res_type="soxr_vhq"
         wavfile.write(
-            "%s/%s_%s.wav" % (self.wavs16k_dir, idx0, idx1),
+            f"{self.wavs16k_dir}/{idx0}_{idx1}.wav",
             16000,
             tmp_audio.astype(np.float32),
         )
@@ -89,9 +89,9 @@ class Preprocess:
                         idx1 += 1
                         break
                 self.norm_write(tmp_audio, idx0, idx1)
-            self.println("%s->Suc." % path)
+            self.println(f"{path}->Suc.")
         except:
-            self.println("%s->%s" % (path, traceback.format_exc()))
+            self.println(f"{path}->{traceback.format_exc()}")
 
     def pipeline_mp(self, infos):
         for path, idx0 in infos:
@@ -100,7 +100,7 @@ class Preprocess:
     def pipeline_mp_inp_dir(self, inp_root, n_p):
         try:
             infos = [
-                ("%s/%s" % (inp_root, name), idx)
+                (f"{inp_root}/{name}", idx)
                 for idx, name in enumerate(sorted(list(os.listdir(inp_root))))
             ]
             if self.noparallel:
@@ -117,7 +117,7 @@ class Preprocess:
                 for i in range(n_p):
                     ps[i].join()
         except:
-            self.println("Fail. %s" % traceback.format_exc())
+            self.println(f"Fail. {traceback.format_exc()}")
 
 class FeatureInput(FeatureExtractor):
     def __init__(self, f0_method, exp_dir, samplerate=16000, hop_size=160, device="cpu", version="v2", if_f0=False):
@@ -141,7 +141,7 @@ class FeatureInput(FeatureExtractor):
 
     def printt(self,strr):
         print(strr)
-        with open("%s/extract_f0_feature.log" % self.exp_dir, "a+") as f:
+        with open(f"{self.exp_dir}/extract_f0_feature.log", "a+") as f:
             f.write("%s\n" % strr)
             f.flush()
 
@@ -167,10 +167,7 @@ class FeatureInput(FeatureExtractor):
             )
 
         feats = feats.squeeze(0).float().cpu().numpy()
-        if np.isnan(feats).sum() == 0:
-            return feats
-        else:
-            return self.printt("==contains nan==")
+        return feats if np.isnan(feats).sum() == 0 else self.printt("==contains nan==")
 
     def compute_f0(self,x):
         p_len = x.shape[0] // self.hop
@@ -181,16 +178,16 @@ class FeatureInput(FeatureExtractor):
         if len(paths) == 0:
             self.printt("no-f0-todo")
         else:
-            self.printt("todo-f0-%s" % len(paths))
+            self.printt(f"todo-f0-{len(paths)}")
             # n = max(len(paths) // 5, 1)  # 每个进程最多打印5条
             for idx, (inp_path, opt_path1, opt_path2, opt_path3) in enumerate(paths):
                 try:
                     # if idx % n == 0:
                     #     self.printt("f0ing,now-%s,all-%s,-%s" % (idx, len(paths), inp_path))
                     if (
-                        os.path.exists(opt_path1 + ".npy") == True
-                        and os.path.exists(opt_path2 + ".npy") == True
-                        and os.path.exists(opt_path3 + ".npy") == True
+                        os.path.exists(f"{opt_path1}.npy") == True
+                        and os.path.exists(f"{opt_path2}.npy") == True
+                        and os.path.exists(f"{opt_path3}.npy") == True
                     ):
                         continue
                     x,_ = load_input_audio(inp_path,self.sr)
@@ -215,7 +212,7 @@ class FeatureInput(FeatureExtractor):
                                     allow_pickle=False,
                                 )  # ori
                 except:
-                    self.printt("f0fail-%s-%s-%s" % (idx, inp_path, traceback.format_exc()))
+                    self.printt(f"f0fail-{idx}-{inp_path}-{traceback.format_exc()}")
 
 def preprocess_trainset(inp_root, sr, n_p, exp_dir):
     try:
@@ -234,22 +231,26 @@ def extract_features_trainset(exp_dir,n_p,f0method,device,version,if_f0):
     try:
         featureInput = FeatureInput(f0_method=f0method,exp_dir=exp_dir,device=device,if_f0=if_f0)
         paths = []
-        inp_root = "%s/1_16k_wavs" % (exp_dir)
-        opt_root1 = "%s/2a_f0" % (exp_dir)
-        opt_root2 = "%s/2b-f0nsf" % (exp_dir)
-        opt_root3 = "%s/3_feature256" % exp_dir if version == "v1" else "%s/3_feature768" % exp_dir
+        inp_root = f"{exp_dir}/1_16k_wavs"
+        opt_root1 = f"{exp_dir}/2a_f0"
+        opt_root2 = f"{exp_dir}/2b-f0nsf"
+        opt_root3 = (
+            f"{exp_dir}/3_feature256"
+            if version == "v1"
+            else f"{exp_dir}/3_feature768"
+        )
 
         os.makedirs(opt_root1, exist_ok=True)
         os.makedirs(opt_root2, exist_ok=True)
         os.makedirs(opt_root3, exist_ok=True)
 
         for name in sorted(list(os.listdir(inp_root))):
-            inp_path = "%s/%s" % (inp_root, name)
+            inp_path = f"{inp_root}/{name}"
             if "spec" in inp_path:
                 continue
-            opt_path1 = "%s/%s" % (opt_root1, name)
-            opt_path2 = "%s/%s" % (opt_root2, name)
-            opt_path3 = "%s/%s" % (opt_root3, name.split(".")[0]) #remove extension
+            opt_path1 = f"{opt_root1}/{name}"
+            opt_path2 = f"{opt_root2}/{name}"
+            opt_path3 = f'{opt_root3}/{name.split(".")[0]}'
             paths.append([inp_path, opt_path1, opt_path2, opt_path3])
 
         ps = []
@@ -269,7 +270,7 @@ def extract_features_trainset(exp_dir,n_p,f0method,device,version,if_f0):
                 try:
                     ps[i].join()
                 except:
-                    featureInput.printt("f0_all_fail-%s" % (traceback.format_exc()))
+                    featureInput.printt(f"f0_all_fail-{traceback.format_exc()}")
 
         return "Successfully extracted features"
     except Exception as e:

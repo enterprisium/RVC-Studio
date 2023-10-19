@@ -19,29 +19,44 @@ def get_subprocesses(pid = os.getpid()):
     for p in python_processes:
         cpu_percent = p.cpu_percent()
         memory_percent = p.memory_percent()
-        process = SimpleNamespace(**{
-            'pid': p.pid,
-            "name": p.name(),
-            'cpu_percent': f"{cpu_percent:.2f}%",
-            'memory_percent': f"{memory_percent:.2f}%",
-            'status': p.status(),
-            'time_started': datetime.fromtimestamp(p.create_time()).isoformat(),
-            'kill': p.kill
-            })
-        yield process
+        yield SimpleNamespace(
+            **{
+                'pid': p.pid,
+                "name": p.name(),
+                'cpu_percent': f"{cpu_percent:.2f}%",
+                'memory_percent': f"{memory_percent:.2f}%",
+                'status': p.status(),
+                'time_started': datetime.fromtimestamp(
+                    p.create_time()
+                ).isoformat(),
+                'kill': p.kill,
+            }
+        )
 
 def get_filenames(root=".",folder="**",exts=["*"],name_filters=[""]):
     fnames = []
     for ext in exts:
         fnames.extend(glob.glob(f"{root}/{folder}/*.{ext}",recursive=True))
-    return sorted([ele for ele in fnames if any([nf.lower() in ele.lower() for nf in name_filters])])
+    return sorted(
+        [
+            ele
+            for ele in fnames
+            if any(nf.lower() in ele.lower() for nf in name_filters)
+        ]
+    )
 
 def get_filenames(root=".",folder="**",exts=["*"],name_filters=[""]):
     fnames = []
     for ext in exts:
         # fnames.extend(glob.glob(f"{root}/{folder}/*.{ext}",recursive=True))
         fnames.extend(glob.glob(os.path.join(root,folder,f"*.{ext}"),recursive=True))
-    return sorted([ele for ele in fnames if any([nf.lower() in ele.lower() for nf in name_filters])])
+    return sorted(
+        [
+            ele
+            for ele in fnames
+            if any(nf.lower() in ele.lower() for nf in name_filters)
+        ]
+    )
 
 def get_index(arr,value): return arr.index(value) if value in arr else 0
 
@@ -56,13 +71,12 @@ def gc_collect():
 def lazyload(name):
     if name in modules:
         return modules[name]
-    else:
-        spec = find_spec(name)
-        loader = LazyLoader(spec.loader)
-        module = module_from_spec(spec)
-        modules[name] = module
-        loader.exec_module(module)
-        return module
+    spec = find_spec(name)
+    loader = LazyLoader(spec.loader)
+    module = module_from_spec(spec)
+    modules[name] = module
+    loader.exec_module(module)
+    return module
     
 def get_optimal_torch_device(index = 0) -> torch.device:
     if torch.cuda.is_available():

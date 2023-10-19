@@ -7,7 +7,7 @@ class TFC(nn.Module):
         super(TFC, self).__init__()
 
         self.H = nn.ModuleList()
-        for i in range(l):
+        for _ in range(l):
             self.H.append(
                 nn.Sequential(
                     nn.Conv2d(in_channels=c, out_channels=c, kernel_size=k, stride=1, padding=k // 2),
@@ -27,7 +27,7 @@ class DenseTFC(nn.Module):
         super(DenseTFC, self).__init__()
 
         self.conv = nn.ModuleList()
-        for i in range(l):
+        for _ in range(l):
             self.conv.append(
                 nn.Sequential(
                     nn.Conv2d(in_channels=c, out_channels=c, kernel_size=k, stride=1, padding=k // 2),

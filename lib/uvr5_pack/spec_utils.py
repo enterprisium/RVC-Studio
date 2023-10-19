@@ -76,10 +76,8 @@ def wave_to_spectrogram(wave, hop_length, n_fft, mid_side=False, mid_side_b2=Fal
 
     spec_left = librosa.stft(wave_left, n_fft, hop_length=hop_length)
     spec_right = librosa.stft(wave_right, n_fft, hop_length=hop_length)
-    
-    spec = np.asfortranarray([spec_left, spec_right])
 
-    return spec
+    return np.asfortranarray([spec_left, spec_right])
    
 def wave_to_spectrogram_mt(wave, hop_length, n_fft, mid_side=False, mid_side_b2=False, reverse=False):
     import threading
@@ -116,13 +114,13 @@ def normalize(wave, is_normalize=False):
     if maxv > 1.0:
         print(f"\nNormalization Set {is_normalize}: Input above threshold for clipping. Max:{maxv}")
         if is_normalize:
-            print(f"The result was normalized.")
+            print("The result was normalized.")
             wave /= maxv
         else:
-            print(f"The result was not normalized.")
+            print("The result was not normalized.")
     else:
         print(f"\nNormalization Set {is_normalize}: Input not above threshold for clipping. Max:{maxv}")
-    
+
     return wave
     
 def normalize_two_stem(wave, mix, is_normalize=False):
@@ -130,65 +128,57 @@ def normalize_two_stem(wave, mix, is_normalize=False):
     
     maxv = np.abs(wave).max()
     max_mix = np.abs(mix).max()
-    
+
     if maxv > 1.0:
         print(f"\nNormalization Set {is_normalize}: Primary source above threshold for clipping. Max:{maxv}")
         print(f"\nNormalization Set {is_normalize}: Mixture above threshold for clipping. Max:{max_mix}")
         if is_normalize:
-            print(f"The result was normalized.")
+            print("The result was normalized.")
             wave /= maxv
             mix /= maxv
         else:
-            print(f"The result was not normalized.")
+            print("The result was not normalized.")
     else:
         print(f"\nNormalization Set {is_normalize}: Input not above threshold for clipping. Max:{maxv}")
-    
-    
+
+
     print(f"\nNormalization Set {is_normalize}: Primary source - Max:{np.abs(wave).max()}")
     print(f"\nNormalization Set {is_normalize}: Mixture - Max:{np.abs(mix).max()}")
-    
+
     return wave, mix    
 
 def combine_spectrograms(specs, mp):
-    l = min([specs[i].shape[2] for i in specs])    
+    l = min(specs[i].shape[2] for i in specs)
     spec_c = np.zeros(shape=(2, mp.param['bins'] + 1, l), dtype=np.complex64)
     offset = 0
     bands_n = len(mp.param['band'])
-    
+
     for d in range(1, bands_n + 1):
         h = mp.param['band'][d]['crop_stop'] - mp.param['band'][d]['crop_start']
         spec_c[:, offset:offset+h, :l] = specs[d][:, mp.param['band'][d]['crop_start']:mp.param['band'][d]['crop_stop'], :l]
         offset += h
-        
+
     if offset > mp.param['bins']:
         raise ValueError('Too much bins')
-        
-    # lowpass fiter
-    if mp.param['pre_filter_start'] > 0: # and mp.param['band'][bands_n]['res_type'] in ['scipy', 'polyphase']:   
+
+    if mp.param['pre_filter_start'] > 0:
         if bands_n == 1:
             spec_c = fft_lp_filter(spec_c, mp.param['pre_filter_start'], mp.param['pre_filter_stop'])
         else:
-            gp = 1        
+            gp = 1
             for b in range(mp.param['pre_filter_start'] + 1, mp.param['pre_filter_stop']):
                 g = math.pow(10, -(b - mp.param['pre_filter_start']) * (3.5 - gp) / 20.0)
                 gp = g
                 spec_c[:, b, :] *= g
-                
+
     return np.asfortranarray(spec_c)
     
 def spectrogram_to_image(spec, mode='magnitude'):
     if mode == 'magnitude':
-        if np.iscomplexobj(spec):
-            y = np.abs(spec)
-        else:
-            y = spec
+        y = np.abs(spec) if np.iscomplexobj(spec) else spec
         y = np.log10(y ** 2 + 1e-8)
     elif mode == 'phase':
-        if np.iscomplexobj(spec):
-            y = np.angle(spec)
-        else:
-            y = spec
-
+        y = np.angle(spec) if np.iscomplexobj(spec) else spec
     y -= y.min()
     y *= 255 / y.max()
     img = np.uint8(y)
@@ -357,16 +347,16 @@ def fft_hp_filter(spec, bin_start, bin_stop):
     return spec
 
 def mirroring(a, spec_m, input_high_end, mp):
-    if 'mirroring' == a:
+    if a == 'mirroring':
         mirror = np.flip(np.abs(spec_m[:, mp.param['pre_filter_start']-10-input_high_end.shape[1]:mp.param['pre_filter_start']-10, :]), 1)
         mirror = mirror * np.exp(1.j * np.angle(input_high_end))
-        
+
         return np.where(np.abs(input_high_end) <= np.abs(mirror), input_high_end, mirror)
-        
-    if 'mirroring2' == a:
+
+    if a == 'mirroring2':
         mirror = np.flip(np.abs(spec_m[:, mp.param['pre_filter_start']-10-input_high_end.shape[1]:mp.param['pre_filter_start']-10, :]), 1)
         mi = np.multiply(mirror, input_high_end * 1.7)
-        
+
         return np.where(np.abs(input_high_end) <= np.abs(mi), input_high_end, mi)
 
 def adjust_aggr(mask, is_non_accom_stem, aggressiveness):
@@ -396,18 +386,14 @@ def stft(wave, nfft, hl):
     wave_right = np.asfortranarray(wave[1])
     spec_left = librosa.stft(wave_left, nfft, hop_length=hl)
     spec_right = librosa.stft(wave_right, nfft, hop_length=hl)
-    spec = np.asfortranarray([spec_left, spec_right])
-
-    return spec
+    return np.asfortranarray([spec_left, spec_right])
 
 def istft(spec, hl):
     spec_left = np.asfortranarray(spec[0])
     spec_right = np.asfortranarray(spec[1])
     wave_left = librosa.istft(spec_left, hop_length=hl)
     wave_right = librosa.istft(spec_right, hop_length=hl)
-    wave = np.asfortranarray([wave_left, wave_right])
-
-    return wave
+    return np.asfortranarray([wave_left, wave_right])
 
 def spec_effects(wave, algorithm='Default', value=None):
     spec = [stft(wave[0],2048,1024), stft(wave[1],2048,1024)]
@@ -450,17 +436,15 @@ def invert_audio(specs, invert_p=True):
     ln = min([specs[0].shape[2], specs[1].shape[2]])
     specs[0] = specs[0][:,:,:ln]
     specs[1] = specs[1][:,:,:ln]
-        
+
     if invert_p:
         X_mag = np.abs(specs[0])
-        y_mag = np.abs(specs[1])            
-        max_mag = np.where(X_mag >= y_mag, X_mag, y_mag)  
-        v_spec = specs[1] - max_mag * np.exp(1.j * np.angle(specs[0]))
+        y_mag = np.abs(specs[1])
+        max_mag = np.where(X_mag >= y_mag, X_mag, y_mag)
+        return specs[1] - max_mag * np.exp(1.j * np.angle(specs[0]))
     else:
         specs[1] = reduce_vocal_aggressively(specs[0], specs[1], 0.2)
-        v_spec = specs[0] - specs[1]
-
-    return v_spec
+        return specs[0] - specs[1]
 
 def invert_stem(mixture, stem):
     
@@ -559,8 +543,6 @@ def average_audio(audio):
     
     waves = []
     wave_shapes = []
-    final_waves = []
-
     for i in range(len(audio)):
         wave = librosa.load(audio[i], sr=44100, mono=False)
         waves.append(wave[0])
@@ -569,16 +551,13 @@ def average_audio(audio):
     wave_shapes_index = wave_shapes.index(max(wave_shapes))
     target_shape = waves[wave_shapes_index]
     waves.pop(wave_shapes_index)
-    final_waves.append(target_shape)
-
+    final_waves = [target_shape]
     for n_array in waves:
         wav_target = to_shape(n_array, target_shape.shape)
         final_waves.append(wav_target)
 
     waves = sum(final_waves)
-    waves = waves/len(audio)
-
-    return waves
+    return waves/len(audio)
     
 def average_dual_sources(wav_1, wav_2, value):
     
@@ -587,9 +566,7 @@ def average_dual_sources(wav_1, wav_2, value):
     if wav_1.shape < wav_2.shape:
         wav_1 = to_shape(wav_1, wav_2.shape)
 
-    wave = (wav_1 * value) + (wav_2 * (1-value))
-
-    return wave
+    return (wav_1 * value) + (wav_2 * (1-value))
     
 def reshape_sources(wav_1: np.ndarray, wav_2: np.ndarray):
     
@@ -610,9 +587,9 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_n
         corr = np.correlate(a, b, "full")
         diff = corr.argmax() - (b.shape[0] - 1)
         return diff
-  
+
     progress_bar_main_var.set(10)
-    
+
     # read tracks
     wav1, sr1 = librosa.load(file1, sr=44100, mono=False)
     wav2, sr2 = librosa.load(file2, sr=44100, mono=False)
@@ -620,17 +597,17 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_n
     wav2 = wav2.transpose()
 
     command_Text(f"Audio file shapes: {wav1.shape} / {wav2.shape}\n")
-    
+
     wav2_org = wav2.copy()
     progress_bar_main_var.set(20)
-    
+
     command_Text("Processing files... \n")
-    
+
   # pick random position and get diff
-    
+
     counts = {}       # counting up for each diff value
     progress = 20
-    
+
     check_range = 64
 
     base = (64 / check_range)
@@ -644,36 +621,36 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_n
         progress_bar_main_var.set(progress)
         diff = get_diff(samp1, samp2)
         diff -= shift
-        
+
     if abs(diff) < 22050:
-        if not diff in counts:
+        if diff not in counts:
             counts[diff] = 0
         counts[diff] += 1
-  
+
   # use max counted diff value
     max_count = 0
     est_diff  = 0
-    for diff in counts.keys():
+    for diff in counts:
         if counts[diff] > max_count:
             max_count = counts[diff]
             est_diff = diff
-    
+
     command_Text(f"Estimated difference is {est_diff} (count: {max_count})\n")
 
     progress_bar_main_var.set(90)
-    
+
     audio_files = []
 
     def save_aligned_audio(wav2_aligned):
         command_Text(f"Aligned File 2 with File 1.\n")
-        command_Text(f"Saving files... ")
+        command_Text("Saving files... ")
         sf.write(file2_aligned, normalize(wav2_aligned, is_normalization), sr2, subtype=wav_type_set)
         save_format(file2_aligned)
         min_len = min(wav1.shape[0], wav2_aligned.shape[0])
         wav_sub = wav1[:min_len] - wav2_aligned[:min_len]
         audio_files.append(file2_aligned)
         return min_len, wav_sub
-    
+
   # make aligned track 2
     if est_diff > 0:
         wav2_aligned = np.append(np.zeros((est_diff, 2)), wav2_org, axis=0)
@@ -683,15 +660,15 @@ def align_audio(file1, file2, file2_aligned, file_subtracted, wav_type_set, is_n
         min_len, wav_sub = save_aligned_audio(wav2_aligned)
     else:
         command_Text(f"Audio files already aligned.\n")
-        command_Text(f"Saving inverted track... ")
+        command_Text("Saving inverted track... ")
         min_len = min(wav1.shape[0], wav2.shape[0])
         wav_sub = wav1[:min_len] - wav2[:min_len]
 
     wav_sub = np.clip(wav_sub, -1, +1)
-  
+
     sf.write(file_subtracted, normalize(wav_sub, is_normalization), sr1, subtype=wav_type_set)
     save_format(file_subtracted)
-  
+
     progress_bar_main_var.set(95)
 
 # from RVC
@@ -708,8 +685,8 @@ def cache_or_load(mix_path, inst_path, mp):
     os.makedirs(mix_cache_dir, exist_ok=True)
     os.makedirs(inst_cache_dir, exist_ok=True)
 
-    mix_cache_path = os.path.join(mix_cache_dir, mix_basename + ".npy")
-    inst_cache_path = os.path.join(inst_cache_dir, inst_basename + ".npy")
+    mix_cache_path = os.path.join(mix_cache_dir, f"{mix_basename}.npy")
+    inst_cache_path = os.path.join(inst_cache_dir, f"{inst_basename}.npy")
 
     if os.path.exists(mix_cache_path) and os.path.exists(inst_cache_path):
         X_spec_m = np.load(mix_cache_path)
@@ -770,7 +747,7 @@ def cache_or_load(mix_path, inst_path, mp):
         y_spec_m = combine_spectrograms(y_spec_s, mp)
 
         if X_spec_m.shape != y_spec_m.shape:
-            raise ValueError("The combined spectrograms are different: " + mix_path)
+            raise ValueError(f"The combined spectrograms are different: {mix_path}")
 
         _, ext = os.path.splitext(mix_path)
 

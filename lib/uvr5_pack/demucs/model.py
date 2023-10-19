@@ -137,10 +137,7 @@ class Demucs(nn.Module):
             if index > 0:
                 out_channels = in_channels
             else:
-                if upsample:
-                    out_channels = channels
-                else:
-                    out_channels = sources * audio_channels
+                out_channels = channels if upsample else sources * audio_channels
             if rewrite:
                 decode += [nn.Conv1d(channels, ch_scale * channels, context), activation]
             if upsample:
@@ -157,11 +154,7 @@ class Demucs(nn.Module):
 
         channels = in_channels
 
-        if lstm_layers:
-            self.lstm = BLSTM(channels, lstm_layers)
-        else:
-            self.lstm = None
-
+        self.lstm = BLSTM(channels, lstm_layers) if lstm_layers else None
         if rescale:
             rescale_module(self, reference=rescale)
 

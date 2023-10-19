@@ -67,8 +67,9 @@ class Separator:
         return vocals, instrumental, input_audio
 
 def get_filename(*args,**kwargs):
-    name = "_".join([str(arg) for arg in args]+[f"{k}={v}" for k,v in kwargs.items()])
-    return name
+    return "_".join(
+        [str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()]
+    )
 
 def __run_inference_worker(arg):
     (model_path,audio_path,agg,device,use_cache,cache_dir,num_threads) = arg

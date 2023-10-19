@@ -32,8 +32,7 @@ SOURCES = ["drums", "bass", "other", "vocals"]
 
 
 def demucs_unittest():
-    model = HDemucs(channels=4, sources=SOURCES)
-    return model
+    return HDemucs(channels=4, sources=SOURCES)
 
 
 def add_model_flags(parser):
@@ -173,8 +172,6 @@ def tasnet(pretrained=True, extra=False):
         raise ValueError("if extra is True, pretrained must be True.")
     model = ConvTasNet(X=10, sources=SOURCES)
     if pretrained:
-        name = 'tasnet'
-        if extra:
-            name = 'tasnet_extra'
+        name = 'tasnet_extra' if extra else 'tasnet'
         _load_state(name, model)
     return model

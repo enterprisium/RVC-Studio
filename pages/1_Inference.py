@@ -47,8 +47,7 @@ def convert_vocals(_state,input_audio,**kwargs):
             return None
 
 def get_rvc_models():
-    fnames = get_filenames(root="./models",folder="RVC",exts=["pth","pt"])
-    return fnames
+    return get_filenames(root="./models",folder="RVC",exts=["pth","pt"])
 
 def init_inference_state():
     state = SimpleNamespace(
@@ -96,13 +95,10 @@ def one_click_convert(state):
         device=state.device,
         **vars(state.uvr5_params),
         )
-    
-    changed_vocals = convert_vocals(
-        state,
-        state.input_vocals,
-        **vars(state.convert_params))
-    
-    if changed_vocals:
+
+    if changed_vocals := convert_vocals(
+        state, state.input_vocals, **vars(state.convert_params)
+    ):
         state.output_vocals = changed_vocals
         mixed_audio = merge_audio(changed_vocals,state.input_instrumental,sr=state.input_audio[1])
         state.output_audio_name = get_filename(

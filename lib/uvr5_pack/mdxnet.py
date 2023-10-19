@@ -48,10 +48,10 @@ class ConvTDFNet(AbstractMDXNet):
 
         if optimizer == 'rmsprop':
             norm = nn.BatchNorm2d
-            
+
         if optimizer == 'adamw':
             norm = lambda input:nn.GroupNorm(2, input)
-            
+
         self.n = num_blocks // 2
         scale = (2, 2)
 
@@ -65,7 +65,7 @@ class ConvTDFNet(AbstractMDXNet):
         c = g
         self.encoding_blocks = nn.ModuleList()
         self.ds = nn.ModuleList()
-        for i in range(self.n):
+        for _ in range(self.n):
             self.encoding_blocks.append(TFC_TDF(c, l, f, k, bn, bias=bias, norm=norm))
             self.ds.append(
                 nn.Sequential(
@@ -81,7 +81,7 @@ class ConvTDFNet(AbstractMDXNet):
 
         self.decoding_blocks = nn.ModuleList()
         self.us = nn.ModuleList()
-        for i in range(self.n):
+        for _ in range(self.n):
             self.us.append(
                 nn.Sequential(
                     nn.ConvTranspose2d(in_channels=c, out_channels=c - g, kernel_size=scale, stride=scale),

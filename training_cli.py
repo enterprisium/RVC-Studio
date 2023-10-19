@@ -81,11 +81,11 @@ def save_checkpoint(ckpt, sr, if_f0, name, epoch, version, hps, model_path="./mo
             hps.model.gin_channels,
             hps.data.sampling_rate,
         ]
-        opt["info"] = "%sepoch" % epoch
+        opt["info"] = f"{epoch}epoch"
         opt["sr"] = sr
         opt["f0"] = if_f0
         opt["version"] = version
-        torch.save(opt, os.path.join(model_path,name+".pth"))
+        torch.save(opt, os.path.join(model_path, f"{name}.pth"))
         return "Success."
     except:
         return traceback.format_exc()
@@ -238,7 +238,7 @@ def run(rank, n_gpus, hps):
         global_step = 0
         if hps.pretrainG != "":
             if rank == 0:
-                logger.info("loaded pretrained %s" % (hps.pretrainG))
+                logger.info(f"loaded pretrained {hps.pretrainG}")
             print(
                 net_g.module.load_state_dict(
                     torch.load(hps.pretrainG, map_location="cpu")["model"]
@@ -246,7 +246,7 @@ def run(rank, n_gpus, hps):
             )  ##测试不加载优化器
         if hps.pretrainD != "":
             if rank == 0:
-                logger.info("loaded pretrained %s" % (hps.pretrainD))
+                logger.info(f"loaded pretrained {hps.pretrainD}")
             print(
                 net_d.module.load_state_dict(
                     torch.load(hps.pretrainD, map_location="cpu")["model"]

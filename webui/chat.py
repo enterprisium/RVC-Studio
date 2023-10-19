@@ -145,12 +145,13 @@ class Character:
                     "role": self.character_data["assistant_template"]["name"],
                     "content": self.character_data["assistant_template"]["greeting"].format(
                         name=self.character_data["assistant_template"]["name"], user=self.user)}
-                output_audio = self.text_to_speech(greeting_message["content"])
-                if (output_audio):
+                if output_audio := self.text_to_speech(
+                    greeting_message["content"]
+                ):
                     sd.play(*output_audio)
                     greeting_message["audio"] = output_audio
                 self.messages.append(greeting_message)
-            
+
             self.loaded=True
         except Exception as e:
             print(e)
@@ -177,8 +178,9 @@ class Character:
     def save_dir(self):
         history_dir = os.path.join(OUTPUT_DIR,"chat",self.name)
         num = len(os.listdir(history_dir)) if os.path.exists(history_dir) else 0
-        save_dir = os.path.join(history_dir,f"{datetime.now().strftime('%Y-%m-%d')}_chat{num}")
-        return save_dir
+        return os.path.join(
+            history_dir, f"{datetime.now().strftime('%Y-%m-%d')}_chat{num}"
+        )
 
     def save_history(self):
         save_dir = self.save_dir
@@ -252,10 +254,9 @@ class Character:
                 model_config["mapper"]["USER"],
                 model_config["mapper"]["CHARACTER"]
                 ],**self.model_data["options"])
-        
+
         for completion_chunk in generator:
-            response = completion_chunk['choices'][0]['text']
-            yield response
+            yield completion_chunk['choices'][0]['text']
 
     def build_context(self,prompt: str):
         model_config = self.model_data["config"]
@@ -273,7 +274,7 @@ class Character:
         elif self.loaded and len(self.LLM.tokenize(self.context.encode("utf-8")))+self.context_size>self.model_data["params"]["n_ctx"]:
             self.context_index+=self.memory
             self.context_summary = self.summarize_context() #summarizes the past
-        
+
 
         # Concatenate chat history and system template
         examples = [
@@ -282,21 +283,19 @@ class Character:
             model_config["chat_template"].format(role=chat_mapper[ex["role"]],content=ex["content"])
                 for ex in self.messages[self.context_index:]
             ] 
-            
+
         instruction = model_config["instruction"].format(name=assistant_template["name"],user=self.user)
         persona = f"{assistant_template['background']} {assistant_template['personality']}"
         context = "\n".join(examples)
-        
-        chat_history_with_template = model_config["prompt_template"].format(
+
+        return model_config["prompt_template"].format(
             context=context,
             instruction=instruction,
             persona=persona,
             name=assistant_template["name"],
             user=self.user,
-            prompt=prompt
-            )
-
-        return chat_history_with_template
+            prompt=prompt,
+        )
     
     def summarize_context(self):
         model_config = self.model_data["config"]
@@ -332,8 +331,11 @@ class Character:
     # Define a method to convert text to speech
     def text_to_speech(self, text):
         tts_audio = generate_speech(text,method=self.character_data["tts_method"], speaker=self.name, device=config.device)
-        output_audio = vc_single(input_audio=tts_audio,**self.voice_model,**self.character_data["tts_options"])
-        return output_audio
+        return vc_single(
+            input_audio=tts_audio,
+            **self.voice_model,
+            **self.character_data["tts_options"]
+        )
 
     # Define a method to run the STT and TTS in the background and be non-blocking
     def speak_and_listen(self, st=None):

@@ -26,10 +26,7 @@ class SessionStateContext:
         return f"SessionStateContext('{self.__name__}',{self.__data__})"
     
     def __getitem__(self, name: str):
-        if name in self.__data__:
-            return self.__data__[name]
-        else:
-            return self.__getattr__(name)
+        return self.__data__[name] if name in self.__data__ else self.__getattr__(name)
         
     def __setitem__(self, name: str, value):
         if name in self.__data__:
@@ -81,7 +78,7 @@ class ProgressBarContext:
     #     return self.__progressbar__.progress(100, f"{self.text}: finished")
 
     def run(self):
-        self.__progressbar__.progress(0.0,f"{self.text}: {0}/{self.max_progress}")
+        self.__progressbar__.progress(0.0, f"{self.text}: 0/{self.max_progress}")
         for i in range(self.max_progress ):
             self.func(self.args[i])
             self.__progressbar__.progress(float((i+1)/self.max_progress),f"{self.text}: {i+1}/{self.max_progress}")
