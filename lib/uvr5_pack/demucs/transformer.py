@@ -249,10 +249,7 @@ class LayerScale(nn.Module):
         self.scale.data[:] = init
 
     def forward(self, x):
-        if self.channel_last:
-            return self.scale * x
-        else:
-            return self.scale[:, None] * x
+        return self.scale * x if self.channel_last else self.scale[:, None] * x
 
 
 class MyGroupNorm(nn.GroupNorm):
@@ -512,12 +509,12 @@ class CrossTransformerEncoderLayer(nn.Module):
         return self.dropout2(x)
 
     def _get_activation_fn(self, activation):
-        if activation == "relu":
-            return F.relu
-        elif activation == "gelu":
+        if activation == "gelu":
             return F.gelu
 
-        raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
+        elif activation == "relu":
+            return F.relu
+        raise RuntimeError(f"activation should be relu/gelu, not {activation}")
 
 
 # ----------------- MULTI-BLOCKS MODELS: -----------------------
@@ -578,7 +575,7 @@ class CrossTransformerEncoder(nn.Module):
             self.cape_mean_normalize = cape_mean_normalize
             self.cape_augment = cape_augment
             self.cape_glob_loc_scale = cape_glob_loc_scale
-        if emb == "scaled":
+        elif emb == "scaled":
             self.position_embeddings = ScaledEmbedding(max_positions, dim, scale=0.2)
 
         self.lr = lr
@@ -622,13 +619,9 @@ class CrossTransformerEncoder(nn.Module):
         }
 
         kwargs_classic_encoder = dict(kwargs_common)
-        kwargs_classic_encoder.update({
-            "sparse": sparse_self_attn,
-        })
+        kwargs_classic_encoder["sparse"] = sparse_self_attn
         kwargs_cross_encoder = dict(kwargs_common)
-        kwargs_cross_encoder.update({
-            "sparse": sparse_cross_attn,
-        })
+        kwargs_cross_encoder["sparse"] = sparse_cross_attn
 
         for idx in range(num_layers):
             if idx % 2 == self.classic_parity:
@@ -811,8 +804,7 @@ def scaled_query_key_softmax(q, k, att_mask):
 def scaled_dot_product_attention(q, k, v, att_mask, dropout):
     att = scaled_query_key_softmax(q, k, att_mask=att_mask)
     att = dropout(att)
-    y = att @ v
-    return y
+    return att @ v
 
 
 def _compute_buckets(x, R):

@@ -202,13 +202,13 @@ def load_stt_models(method="vosk",recognizer=None):
             temp_dir = os.path.join(BASE_CACHE_DIR,"zips")
             os.makedirs(temp_dir,exist_ok=True)
             name = os.path.basename(model_path)
-            zip_path = os.path.join(temp_dir,name)+".zip"
+            zip_path = f"{os.path.join(temp_dir, name)}.zip"
             download_link = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip"
             download_file((zip_path,download_link))
             print(f"extracting zip file: {zip_path}")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(STT_MODELS_DIR)
-            print(f"finished extracting zip file")
+            print("finished extracting zip file")
 
         model = Model(model_path=model_path,lang="en")
         recognizer.vosk_model = model
@@ -220,7 +220,7 @@ def load_stt_models(method="vosk",recognizer=None):
         from transformers import SpeechT5Processor, SpeechT5ForSpeechToText
         processor = SpeechT5Processor.from_pretrained(stt_checkpoint,cache_dir=os.path.join(STT_MODELS_DIR,stt_checkpoint))
         generator = SpeechT5ForSpeechToText.from_pretrained(stt_checkpoint,cache_dir=os.path.join(STT_MODELS_DIR,stt_checkpoint))
-        
+
         return {
             "processor": processor,
             "generator": generator
@@ -236,14 +236,13 @@ def transcribe_speech(audio,stt_models=None,stt_method="vosk"):
         recognizer
         input_data = recognizer.recognize_vosk(audio)
         input_data = json.loads(input_data)
-        transcription = input_data["text"] if "text" in input_data else None
-        return transcription
+        return input_data["text"] if "text" in input_data else None
     elif stt_method=="speecht5":
         processor = stt_models["processor"]
         model = stt_models["generator"]
         input_audio = bytes_to_audio(audio.get_wav_data())
         inputs = processor(audio=input_audio[0].T, sampling_rate=input_audio[1], return_tensors="pt")
-        
+
         audio_len = int(len(input_audio[0])*6.25//input_audio[1])+1 #average 2.5 words/s spoken at 2.5 token/word
 
         predicted_ids = model.generate(**inputs, max_length=min(150,audio_len))

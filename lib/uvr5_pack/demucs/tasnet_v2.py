@@ -155,8 +155,7 @@ class Encoder(nn.Module):
         Returns:
             mixture_w: [M, N, K], where K = (T-L)/(L/2)+1 = 2T/L-1
         """
-        mixture_w = F.relu(self.conv1d_U(mixture))  # [M, N, K]
-        return mixture_w
+        return F.relu(self.conv1d_U(mixture))
 
 
 class Decoder(nn.Module):
@@ -213,7 +212,7 @@ class TemporalConvNet(nn.Module):
         bottleneck_conv1x1 = nn.Conv1d(N, B, 1, bias=False)
         # [M, B, K] -> [M, B, K]
         repeats = []
-        for r in range(R):
+        for _ in range(R):
             blocks = []
             for x in range(X):
                 dilation = 2**x
@@ -389,8 +388,7 @@ class ChannelwiseLayerNorm(nn.Module):
         """
         mean = torch.mean(y, dim=1, keepdim=True)  # [M, 1, K]
         var = torch.var(y, dim=1, keepdim=True, unbiased=False)  # [M, 1, K]
-        cLN_y = self.gamma * (y - mean) / torch.pow(var + EPS, 0.5) + self.beta
-        return cLN_y
+        return self.gamma * (y - mean) / torch.pow(var + EPS, 0.5) + self.beta
 
 
 class GlobalLayerNorm(nn.Module):
@@ -415,8 +413,7 @@ class GlobalLayerNorm(nn.Module):
         # TODO: in torch 1.0, torch.mean() support dim list
         mean = y.mean(dim=1, keepdim=True).mean(dim=2, keepdim=True)  # [M, 1, 1]
         var = (torch.pow(y - mean, 2)).mean(dim=1, keepdim=True).mean(dim=2, keepdim=True)
-        gLN_y = self.gamma * (y - mean) / torch.pow(var + EPS, 0.5) + self.beta
-        return gLN_y
+        return self.gamma * (y - mean) / torch.pow(var + EPS, 0.5) + self.beta
 
 
 if __name__ == "__main__":

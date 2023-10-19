@@ -137,11 +137,7 @@ class DConv(nn.Module):
         hidden = int(channels / compress)
 
         act: tp.Type[nn.Module]
-        if gelu:
-            act = nn.GELU
-        else:
-            act = nn.ReLU
-
+        act = nn.GELU if gelu else nn.ReLU
         self.layers = nn.ModuleList([])
         for d in range(self.depth):
             dilation = 2 ** d if dilate else 1
@@ -327,11 +323,7 @@ class Demucs(nn.Module):
         else:
             activation = nn.ReLU()
             ch_scale = 1
-        if gelu:
-            act2 = nn.GELU
-        else:
-            act2 = nn.ReLU
-
+        act2 = nn.GELU if gelu else nn.ReLU
         in_channels = audio_channels
         padding = 0
         for index in range(depth):
@@ -357,10 +349,7 @@ class Demucs(nn.Module):
             self.encoder.append(nn.Sequential(*encode))
 
             decode = []
-            if index > 0:
-                out_channels = in_channels
-            else:
-                out_channels = len(self.sources) * audio_channels
+            out_channels = in_channels if index > 0 else len(self.sources) * audio_channels
             if rewrite:
                 decode += [
                     nn.Conv1d(channels, ch_scale * channels, 2 * context + 1, padding=context),
@@ -377,11 +366,7 @@ class Demucs(nn.Module):
             channels = int(growth * channels)
 
         channels = in_channels
-        if lstm_layers:
-            self.lstm = BLSTM(channels, lstm_layers)
-        else:
-            self.lstm = None
-
+        self.lstm = BLSTM(channels, lstm_layers) if lstm_layers else None
         if rescale:
             rescale_module(self, reference=rescale)
 
@@ -401,7 +386,7 @@ class Demucs(nn.Module):
             length = math.ceil((length - self.kernel_size) / self.stride) + 1
             length = max(1, length)
 
-        for idx in range(self.depth):
+        for _ in range(self.depth):
             length = (length - 1) * self.stride + self.kernel_size
 
         if self.resample:

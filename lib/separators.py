@@ -33,11 +33,7 @@ class UVR5Base:
         cpk = torch.load(model_path, map_location=self.device)
         model.load_state_dict(cpk)
         model.eval()
-        if is_half:
-            model = model.half().to(device)
-        else:
-            model = model.to(device)
-
+        model = model.half().to(device) if is_half else model.to(device)
         self.mp = mp
         self.model = model
     
@@ -51,7 +47,7 @@ class UVR5Base:
             model_hash = hashlib.md5(open(model_path, 'rb').read()).hexdigest()
 
         print(model_hash)
-        model_settings_json = os.path.splitext(model_path)[0]+".json"
+        model_settings_json = f"{os.path.splitext(model_path)[0]}.json"
         model_data_json = os.path.join(os.path.dirname(model_path),"model_data.json")
 
         if os.path.isfile(model_settings_json):
@@ -115,10 +111,7 @@ class UVR5Base:
 
         X_mag_pad = np.pad(X_mag_pre, ((0, 0), (0, 0), (pad_l, pad_r)), mode="constant")
 
-        if list(model.state_dict().values())[0].dtype == torch.float16:
-            is_half = True
-        else:
-            is_half = False
+        is_half = list(model.state_dict().values())[0].dtype == torch.float16
         pred = _execute(
             X_mag_pad, roi_size, n_window, device, model, aggressiveness, is_half
         )
@@ -262,11 +255,7 @@ class UVR5New(UVR5Base):
         cpk = torch.load(model_path, map_location=self.device)
         model.load_state_dict(cpk)
         model.eval()
-        if is_half:
-            model = model.half().to(device)
-        else:
-            model = model.to(device)
-
+        model = model.half().to(device) if is_half else model.to(device)
         self.mp = mp
         self.model = model
     
@@ -300,20 +289,15 @@ class MDXNet:
                 ((vocals,self.sr),target_sr,False,True,self.sr!=target_sr,True)
             ])
 
-        return_dict = {
-            "sr": target_sr,
-            "instrumentals": results[0],
-            "vocals": results[1]
-        }
-        return return_dict
+        return {"sr": target_sr, "instrumentals": results[0], "vocals": results[1]}
     
     def run_inference(self, audio_path):
         
-        mdx_net_cut = True if self.model.params.stem_name in MDX_NET_FREQ_CUT else False
+        mdx_net_cut = self.model.params.stem_name in MDX_NET_FREQ_CUT
         mix, raw_mix, samplerate = prepare_mix(audio_path, self.model.chunks, self.model.margin, mdx_net_cut=mdx_net_cut)
         wave_processed = self.model.demix_base(mix, is_ckpt=self.is_mdx_ckpt)[0]
-        
-    
+
+
         raw_mix = self.model.demix_base(raw_mix, is_match_mix=True)[0] if mdx_net_cut else raw_mix
 
         return_dict = self.process_audio(primary=wave_processed,secondary=(raw_mix-wave_processed),target_sr=samplerate)
@@ -336,17 +320,17 @@ def prepare_mix(mix, chunk_set, margin_set, mdx_net_cut=False):
 
     def get_segmented_mix(chunk_set=chunk_set):
         segmented_mix = {}
-        
+
         samples = mix.shape[-1]
         margin = margin_set
         chunk_size = chunk_set*44100
-        assert not margin == 0, 'margin cannot be zero!'
-        
+        assert margin != 0, 'margin cannot be zero!'
+
         if margin > chunk_size:
             margin = chunk_size
         if chunk_set == 0 or samples < chunk_size:
             chunk_size = samples
-        
+
         counter = -1
         for skip in range(0, samples, chunk_size):
             counter+=1
@@ -356,10 +340,11 @@ def prepare_mix(mix, chunk_set, margin_set, mdx_net_cut=False):
             segmented_mix[skip] = mix[:,start:end].copy()
             if end == samples:
                 break
-            
+
         return segmented_mix
 
-    
+
+
     segmented_mix = get_segmented_mix()
     raw_mix = get_segmented_mix(chunk_set=0) if mdx_net_cut else mix
     return segmented_mix, raw_mix, samplerate

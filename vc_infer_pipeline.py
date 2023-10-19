@@ -64,10 +64,7 @@ class VC(FeatureExtractor):
         protect,
     ):  # ,file_index,file_big_npy
         feats = torch.from_numpy(audio0)
-        if self.is_half:
-            feats = feats.half()
-        else:
-            feats = feats.float()
+        feats = feats.half() if self.is_half else feats.float()
         if feats.dim() == 2:  # double channels
             feats = feats.mean(-1)
         assert feats.dim() == 1, feats.dim()
@@ -86,8 +83,8 @@ class VC(FeatureExtractor):
         if protect < 0.5 and pitch != None and pitchf != None:
             feats0 = feats.clone()
         if (
-            isinstance(index, type(None)) == False
-            and isinstance(big_npy, type(None)) == False
+            not isinstance(index, type(None))
+            and not isinstance(big_npy, type(None))
             and index_rate != 0
         ):
             npy = feats[0].cpu().numpy()
@@ -195,10 +192,9 @@ class VC(FeatureExtractor):
             else:
                 if os.path.exists(file_index):
                     sys.stdout.write(f"Attempting to load {file_index}....\n")
-                    sys.stdout.flush()
                 else:
                     sys.stdout.write(f"Attempting to load {file_index}.... (despite it not existing)\n")
-                    sys.stdout.flush()
+                sys.stdout.flush()
                 index = faiss.read_index(file_index)
                 sys.stdout.write(f"loaded index: {index}\n")
                 big_npy = index.reconstruct_n(0, index.ntotal)
@@ -210,12 +206,12 @@ class VC(FeatureExtractor):
         audio = signal.filtfilt(bh, ah, audio)
         audio_pad = np.pad(audio, (self.window // 2, self.window // 2), mode="reflect")
         opt_ts = []
-        
+
         if audio_pad.shape[0] > self.t_max:
             audio_sum = np.zeros_like(audio)
             for i in range(self.window):
                 audio_sum += audio_pad[i : i - self.window]
-            
+
             for t in range(self.t_center, audio.shape[0], self.t_center):
                 abs_audio_sum = np.abs(audio_sum[t - self.t_query : t + self.t_query])
                 min_abs_audio_sum = abs_audio_sum.min()
@@ -243,7 +239,7 @@ class VC(FeatureExtractor):
             pitch, pitchf = self.get_f0(
                 audio_pad, p_len, f0_up_key, f0_method, merge_type,
                 filter_radius, crepe_hop_length, f0_autotune, rmvpe_onnx, inp_f0, f0_min, f0_max)
-            
+
             pitch = pitch[:p_len].astype(np.int64 if self.device != 'mps' else np.float32)
             pitchf = pitchf[:p_len].astype(np.float32)
             pitch = torch.from_numpy(pitch).to(self.device).unsqueeze(0)
@@ -253,7 +249,7 @@ class VC(FeatureExtractor):
         times[1] += t2 - t1
 
         # with tqdm(total=len(opt_ts), desc="Processing", unit="window") as pbar:
-        for i, t in enumerate(opt_ts):
+        for t in opt_ts:
             t = t // self.window * self.window
             start = s
             end = t + self.t_pad2 + self.window
@@ -262,14 +258,11 @@ class VC(FeatureExtractor):
             pitchf_slice = pitchf[:, start // self.window:end // self.window] if if_f0 else None
             audio_opt.append(self.vc(model, net_g, sid, audio_slice, pitch_slice, pitchf_slice, times, index, big_npy, index_rate, version, protect)[self.t_pad_tgt : -self.t_pad_tgt])
             s = t
-                # pbar.update(1)
-                # pbar.refresh()
-
         audio_slice = audio_pad[t:]
         pitch_slice = pitch[:, t // self.window:] if if_f0 and t is not None else pitch
         pitchf_slice = pitchf[:, t // self.window:] if if_f0 and t is not None else pitchf
         audio_opt.append(self.vc(model, net_g, sid, audio_slice, pitch_slice, pitchf_slice, times, index, big_npy, index_rate, version, protect)[self.t_pad_tgt : -self.t_pad_tgt])
-        
+
         audio_opt = np.concatenate(audio_opt)
         if rms_mix_rate != 1:
             audio_opt = change_rms(audio, 16000, audio_opt, tgt_sr, rms_mix_rate)
@@ -284,7 +277,7 @@ class VC(FeatureExtractor):
 
         print("Returning completed audio...")
         print("-------------------")
-        
+
         return audio_opt
 
 def get_vc(model_path,config,device=None):
@@ -294,7 +287,7 @@ def get_vc(model_path,config,device=None):
     cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]  # n_spk
     if_f0 = cpt.get("f0", 1)
     version = cpt.get("version", "v1")
-    
+
     if version == "v1":
         if if_f0 == 1:
             from lib.infer_pack.models import SynthesizerTrnMs256NSFsid
@@ -310,13 +303,10 @@ def get_vc(model_path,config,device=None):
             from lib.infer_pack.models import SynthesizerTrnMs768NSFsid_nono
             net_g = SynthesizerTrnMs768NSFsid_nono(*cpt["config"])
     del net_g.enc_q
-    
+
     net_g.load_state_dict(cpt["weight"], strict=False)
     net_g.eval().to(device if device else config.device)
-    if config.is_half:
-        net_g = net_g.half()
-    else:
-        net_g = net_g.float()
+    net_g = net_g.half() if config.is_half else net_g.float()
     vc = VC(tgt_sr, config)
     hubert_model = load_hubert(config)
     model_name = os.path.basename(model_path).split(".")[0]
@@ -333,10 +323,7 @@ def load_hubert(config):
         )
         hubert_model = models[0]
         hubert_model = hubert_model.to(config.device)
-        if config.is_half:
-            hubert_model = hubert_model.half()
-        else:
-            hubert_model = hubert_model.float()
+        hubert_model = hubert_model.half() if config.is_half else hubert_model.float()
         hubert_model.eval()
         return hubert_model
     except Exception as e:
@@ -368,14 +355,14 @@ def vc_single(
     **kwargs #prevents function from breaking
 ):
     print(f"vc_single unused args: {kwargs}")
-    if hubert_model == None:
+    if hubert_model is None:
         hubert_model = load_hubert(config)
 
     if not (cpt and net_g and vc and hubert_model):
         return None
 
     tgt_sr = cpt["config"][-1]
-    
+
     version = cpt.get("version", "v1")
 
     if input_audio is None and input_audio_path is None:
@@ -383,12 +370,12 @@ def vc_single(
     f0_up_key = int(f0_up_key)
     try:
         audio = input_audio[0] if input_audio is not None else load_input_audio(input_audio_path, 16000)
-        
+
         audio,_ = remix_audio((audio,input_audio[1] if input_audio is not None else 16000), target_sr=16000, norm=True,  to_mono=True)
 
         times = [0, 0, 0]
         if_f0 = cpt.get("f0", 1)
-        
+
         """
         model, net_g, sid, audio, times, f0_up_key, f0_method,
             file_index, index_rate, if_f0, filter_radius, tgt_sr, resample_sr, rms_mix_rate,
@@ -415,14 +402,14 @@ def vc_single(
             crepe_hop_length, f0_autotune, is_onnx,
             f0_file=f0_file,
         )
-        
+
         index_info = (
-            "Using index:%s." % file_index
+            f"Using index:{file_index}."
             if os.path.exists(file_index)
             else "Index not used."
         )
         print(index_info)
-        
+
         return (audio_opt, resample_sr if resample_sr >= 16000 and tgt_sr != resample_sr else tgt_sr)
     except Exception as info:
         print(info)

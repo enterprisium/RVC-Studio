@@ -68,8 +68,7 @@ def audio_to_bytes(audio,sr,format='WAV'):
     return bytes_io.read()
 
 def bytes_to_audio(data):
-    if type(data)==io.BytesIO: bytes_io=data
-    else: bytes_io = io.BytesIO(bytes(data))
+    bytes_io = data if type(data)==io.BytesIO else io.BytesIO(bytes(data))
     audio, sr = sf.read(bytes_io)
     if audio.ndim>1:
         if audio.shape[-1]<audio.shape[0]: # is channel-last format
@@ -106,13 +105,13 @@ def autotune_f0(f0, threshold=0.):
         diff = np.abs(AUTOTUNE_NOTES - freq)
         # Find the index of the minimum difference
         idx = np.argmin(diff)
-        # Find the corresponding value in array2
-        y = AUTOTUNE_NOTES[idx]
         # Check if the difference is less than threshold
         if diff[idx] < threshold:
             # Keep the value in array1
             autotuned_f0.append(freq)
         else:
+            # Find the corresponding value in array2
+            y = AUTOTUNE_NOTES[idx]
             # Use the nearest value in array2
             autotuned_f0.append(y)
     # Return the result as a numpy array

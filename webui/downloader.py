@@ -83,6 +83,6 @@ def save_zipped_files(params: Tuple[str, any]):
     print(f"extracting zip file: {zip_path}")
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(os.path.dirname(data_path))
-    print(f"finished extracting zip file")
-    
+    print("finished extracting zip file")
+
     os.remove(zip_path) # cleanup

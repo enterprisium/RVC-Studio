@@ -471,11 +471,10 @@ class HTDemucs(nn.Module):
             return out
         if self.training:
             niters = self.end_iters
-        if niters < 0:
-            z = z[:, None]
-            return z / (1e-8 + z.abs()) * m
-        else:
+        if niters >= 0:
             return self._wiener(m, z, niters)
+        z = z[:, None]
+        return z / (1e-8 + z.abs()) * m
 
     def _wiener(self, mag_out, mix_stft, niters):
         # apply wiener filtering from OpenUnmix.

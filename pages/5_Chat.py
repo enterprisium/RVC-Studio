@@ -28,16 +28,26 @@ if CWD not in sys.path:
     sys.path.append(CWD)
 
 def get_model_list():
-    models_list =  [os.path.relpath(path,CWD) for path in get_filenames(root="./models",folder="LLM",exts=["bin","gguf"])]
-    return models_list
+    return [
+        os.path.relpath(path, CWD)
+        for path in get_filenames(
+            root="./models", folder="LLM", exts=["bin", "gguf"]
+        )
+    ]
 
 def get_voice_list():
-    models_list = [os.path.relpath(path,CWD) for path in get_filenames(root="./models",folder="RVC",exts=["pth"])]
-    return models_list
+    return [
+        os.path.relpath(path, CWD)
+        for path in get_filenames(root="./models", folder="RVC", exts=["pth"])
+    ]
 
 def get_character_list():
-    models_list =  [os.path.relpath(path,CWD) for path in get_filenames(root="./models",folder="RVC/.characters",exts=["json"])]
-    return models_list
+    return [
+        os.path.relpath(path, CWD)
+        for path in get_filenames(
+            root="./models", folder="RVC/.characters", exts=["json"]
+        )
+    ]
 
 def init_state():
     state = SimpleNamespace(

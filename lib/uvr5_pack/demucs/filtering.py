@@ -259,13 +259,17 @@ def expectation_maximization(
 
     # allocate the spatial covariance matrices
     R = [
-        torch.zeros((nb_bins, nb_channels, nb_channels, 2), dtype=x.dtype, device=x.device)
-        for j in range(nb_sources)
+        torch.zeros(
+            (nb_bins, nb_channels, nb_channels, 2),
+            dtype=x.dtype,
+            device=x.device,
+        )
+        for _ in range(nb_sources)
     ]
     weight: torch.Tensor = torch.zeros((nb_bins,), dtype=x.dtype, device=x.device)
 
     v: torch.Tensor = torch.zeros((nb_frames, nb_bins, nb_sources), dtype=x.dtype, device=x.device)
-    for it in range(iterations):
+    for _ in range(iterations):
         # constructing the mixture covariance matrix. Doing it with a loop
         # to avoid storing anytime in RAM the whole 6D tensor
 

@@ -48,13 +48,12 @@ def auto_load_demucs_model_v2(sources, demucs_model_name):
         channels=4
     else:
         channels=64
-    
-    if 'tasnet' in demucs_model_name:
-        init_demucs_model = ConvTasNet(sources, X=10)
-    else:
-        init_demucs_model = Demucs(sources, channels=channels)
-        
-    return init_demucs_model
+
+    return (
+        ConvTasNet(sources, X=10)
+        if 'tasnet' in demucs_model_name
+        else Demucs(sources, channels=channels)
+    )
 
 class Demucs(nn.Module):
     @capture_init
@@ -135,10 +134,7 @@ class Demucs(nn.Module):
             self.encoder.append(nn.Sequential(*encode))
 
             decode = []
-            if index > 0:
-                out_channels = in_channels
-            else:
-                out_channels = len(self.sources) * audio_channels
+            out_channels = in_channels if index > 0 else len(self.sources) * audio_channels
             if rewrite:
                 decode += [nn.Conv1d(channels, ch_scale * channels, context), activation]
             decode += [nn.ConvTranspose1d(channels, out_channels, kernel_size, stride)]
@@ -150,11 +146,7 @@ class Demucs(nn.Module):
 
         channels = in_channels
 
-        if lstm_layers:
-            self.lstm = BLSTM(channels, lstm_layers)
-        else:
-            self.lstm = None
-
+        self.lstm = BLSTM(channels, lstm_layers) if lstm_layers else None
         if rescale:
             rescale_module(self, reference=rescale)
 

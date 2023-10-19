@@ -117,11 +117,10 @@ class TensorChunk:
 def tensor_chunk(tensor_or_chunk):
     if isinstance(tensor_or_chunk, TensorChunk):
         return tensor_or_chunk
-    else:
-        assert isinstance(tensor_or_chunk, th.Tensor)
-        return TensorChunk(tensor_or_chunk)
+    assert isinstance(tensor_or_chunk, th.Tensor)
+    return TensorChunk(tensor_or_chunk)
 
-def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power=1., static_shifts=1, set_progress_bar=None, device=None, progress=False, num_workers=0, pool=None): 
+def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power=1., static_shifts=1, set_progress_bar=None, device=None, progress=False, num_workers=0, pool=None):
     """
     Apply model to a given mixture.
 
@@ -143,17 +142,14 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
     global fut_length
     global bag_num
     global prog_bar
-    
-    if device is None:
-        device = mix.device
-    else:
-        device = th.device(device)
+
+    device = mix.device if device is None else th.device(device)
     if pool is None:
         if num_workers > 0 and device.type == 'cpu':
             pool = ThreadPoolExecutor(num_workers)
         else:
             pool = DummyPoolExecutor()
-            
+
     kwargs = {
         'shifts': shifts,
         'split': split,
@@ -165,7 +161,7 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
         'set_progress_bar': set_progress_bar,
         'static_shifts': static_shifts,
     }
-    
+
     if isinstance(model, BagOfModels):
         # Special treatment for bag of model.
         # We explicitely apply multiple times `apply_model` so that the random shifts
@@ -176,12 +172,10 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
         bag_num = len(model.models)
         fut_length = 0
         prog_bar = 0
-        current_model = 0 #(bag_num + 1)
-        for sub_model, weight in zip(model.models, model.weights):
+        for current_model, (sub_model, weight) in enumerate(zip(model.models, model.weights)):
             original_model_device = next(iter(sub_model.parameters())).device
             sub_model.to(device)
             fut_length += fut_length
-            current_model += 1
             out = apply_model(sub_model, mix, **kwargs)
             sub_model.to(original_model_device)
             for k, inst_weight in enumerate(weight):
@@ -198,7 +192,7 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
     model.eval()
     assert transition_power >= 1, "transition_power < 1 leads to weird behavior."
     batch, channels, length = mix.shape
-    
+
     if shifts:
         kwargs['shifts'] = 0
         max_shift = int(0.5 * model.samplerate)
@@ -264,31 +258,28 @@ def demucs_segments(demucs_segment, demucs_model):
     
     if demucs_segment == 'Default':
         segment = None
-        if isinstance(demucs_model, BagOfModels):
-            if segment is not None:
+        if segment is not None:
+            if isinstance(demucs_model, BagOfModels):
                 for sub in demucs_model.models:
                     sub.segment = segment
-        else:
-            if segment is not None:
+            else:
                 sub.segment = segment
     else:
         try:
             segment = int(demucs_segment)
-            if isinstance(demucs_model, BagOfModels):
-                if segment is not None:
+            if segment is not None:
+                if isinstance(demucs_model, BagOfModels):
                     for sub in demucs_model.models:
                         sub.segment = segment
-            else:
-                if segment is not None:
+                else:
                     sub.segment = segment
         except:
             segment = None
-            if isinstance(demucs_model, BagOfModels):
-                if segment is not None:
+            if segment is not None:
+                if isinstance(demucs_model, BagOfModels):
                     for sub in demucs_model.models:
                         sub.segment = segment
-            else:
-                if segment is not None:
+                else:
                     sub.segment = segment
-                    
+
     return demucs_model

@@ -67,8 +67,8 @@ class FeatureExtractor:
             audio = torch.mean(audio, dim=0, keepdim=True).detach()
         audio = audio.detach()
         hop_length = kwargs.get('crepe_hop_length', 160)
-        model = kwargs.get('model', 'full') 
-        print("Initiating prediction with a crepe_hop_length of: " + str(hop_length))
+        model = kwargs.get('model', 'full')
+        print(f"Initiating prediction with a crepe_hop_length of: {str(hop_length)}")
         pitch: torch.Tensor = torchcrepe.predict(
             audio,
             self.sr,
@@ -89,8 +89,7 @@ class FeatureExtractor:
             np.arange(0, len(source)),
             source,
         )
-        f0 = np.nan_to_num(target)
-        return f0  # Resized f0
+        return np.nan_to_num(target)
     
     def get_f0_official_crepe_computation(
         self,

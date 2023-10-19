@@ -58,8 +58,7 @@ class ScaledEmbedding(nn.Module):
         return self.embedding.weight * self.scale
 
     def forward(self, x):
-        out = self.embedding(x) * self.scale
-        return out
+        return self.embedding(x) * self.scale
 
 
 class HEncLayer(nn.Module):
@@ -87,10 +86,7 @@ class HEncLayer(nn.Module):
         norm_fn = lambda d: nn.Identity()  # noqa
         if norm:
             norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  # noqa
-        if pad:
-            pad = kernel_size // 4
-        else:
-            pad = 0
+        pad = kernel_size // 4 if pad else 0
         klass = nn.Conv1d
         self.freq = freq
         self.kernel_size = kernel_size
@@ -127,7 +123,7 @@ class HEncLayer(nn.Module):
 
         if not self.freq:
             le = x.shape[-1]
-            if not le % self.stride == 0:
+            if le % self.stride != 0:
                 x = F.pad(x, (0, self.stride - (le % self.stride)))
         y = self.conv(x)
         if self.empty:
@@ -177,7 +173,7 @@ class MultiWrap(nn.Module):
         assert layer.pad
         if not self.conv:
             assert not layer.context_freq
-        for k in range(len(split_ratios) + 1):
+        for _ in range(len(split_ratios) + 1):
             lay = deepcopy(layer)
             if self.conv:
                 lay.conv.padding = (0, 0)
@@ -219,10 +215,7 @@ class MultiWrap(nn.Module):
                 outs.append(layer(y))
                 start = limit - layer.kernel_size + layer.stride
             else:
-                if ratio == 1:
-                    limit = Fr
-                else:
-                    limit = int(round(Fr * ratio))
+                limit = Fr if ratio == 1 else int(round(Fr * ratio))
                 last = layer.last
                 layer.last = True
 
@@ -243,10 +236,7 @@ class MultiWrap(nn.Module):
         out = torch.cat(outs, dim=2)
         if not self.conv and not last:
             out = F.gelu(out)
-        if self.conv:
-            return out
-        else:
-            return out, None
+        return out if self.conv else (out, None)
 
 
 class HDecLayer(nn.Module):
@@ -260,10 +250,7 @@ class HDecLayer(nn.Module):
         norm_fn = lambda d: nn.Identity()  # noqa
         if norm:
             norm_fn = lambda d: nn.GroupNorm(norm_groups, d)  # noqa
-        if pad:
-            pad = kernel_size // 4
-        else:
-            pad = 0
+        pad = kernel_size // 4 if pad else 0
         self.pad = pad
         self.last = last
         self.freq = freq
@@ -305,10 +292,7 @@ class HDecLayer(nn.Module):
         if not self.empty:
             x = x + skip
 
-            if self.rewrite:
-                y = F.glu(self.norm1(self.rewrite(x)), dim=1)
-            else:
-                y = x
+            y = F.glu(self.norm1(self.rewrite(x)), dim=1) if self.rewrite else x
             if self.dconv:
                 if self.freq:
                     B, C, Fr, T = y.shape
@@ -620,10 +604,7 @@ class HDemucs(nn.Module):
             else:
                 le = hl * int(math.ceil(length / hl))
             x = ispectro(z, hl, length=le)
-            if not self.hybrid_old:
-                x = x[..., pad:pad + length]
-            else:
-                x = x[..., :length]
+            x = x[..., pad:pad + length] if not self.hybrid_old else x[..., :length]
         else:
             x = ispectro(z, hl, length)
         return x
@@ -650,11 +631,10 @@ class HDemucs(nn.Module):
             return out
         if self.training:
             niters = self.end_iters
-        if niters < 0:
-            z = z[:, None]
-            return z / (1e-8 + z.abs()) * m
-        else:
+        if niters >= 0:
             return self._wiener(m, z, niters)
+        z = z[:, None]
+        return z / (1e-8 + z.abs()) * m
 
     def _wiener(self, mag_out, mix_stft, niters):
         # apply wiener filtering from OpenUnmix.

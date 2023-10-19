@@ -36,15 +36,14 @@ def load_model(_state,model_name):
             "file_index": index_file[0] if len(index_file) else "",
             "hubert_model": _state.hubert_model
         }
-    else:
-        _state = clear_data(_state)
-        data = get_vc(model_name,config=config,device=_state.device)
-        _state.vc = data["vc"]
-        _state.cpt = data["cpt"]
-        _state.net_g = data["net_g"]
-        _state.hubert_model = data["hubert_model"]
-        data["file_index"] = index_file[0] if len(index_file) else ""
-        return data
+    _state = clear_data(_state)
+    data = get_vc(model_name,config=config,device=_state.device)
+    _state.vc = data["vc"]
+    _state.cpt = data["cpt"]
+    _state.net_g = data["net_g"]
+    _state.hubert_model = data["hubert_model"]
+    data["file_index"] = index_file[0] if len(index_file) else ""
+    return data
 
 def convert_vocals(_state,input_audio,**kwargs):
     print(f"converting vocals... {_state.model_name} - {kwargs}")
@@ -53,8 +52,7 @@ def convert_vocals(_state,input_audio,**kwargs):
     return vc_single(input_audio=input_audio,**models,**kwargs)
 
 def get_models(folder="."):
-    fnames = get_filenames(root="./models",folder=folder,exts=["pth","pt"])
-    return fnames
+    return get_filenames(root="./models",folder=folder,exts=["pth","pt"])
 
 def init_inference_state():
     state = SimpleNamespace(

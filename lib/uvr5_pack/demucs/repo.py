@@ -30,10 +30,10 @@ def check_checksum(path: Path, checksum: str):
     sha = sha256()
     with open(path, 'rb') as file:
         while True:
-            buf = file.read(2**20)
-            if not buf:
+            if buf := file.read(2**20):
+                sha.update(buf)
+            else:
                 break
-            sha.update(buf)
     actual_checksum = sha.hexdigest()[:len(checksum)]
     if actual_checksum != checksum:
         raise ModelLoadingError(f'Invalid checksum for file {path}, '

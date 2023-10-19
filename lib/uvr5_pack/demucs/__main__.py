@@ -72,10 +72,12 @@ def main():
             print("Error: distributed training is only available with cuda device", file=sys.stderr)
             sys.exit(1)
         th.cuda.set_device(args.rank % th.cuda.device_count())
-        distributed.init_process_group(backend="nccl",
-                                       init_method="tcp://" + args.master,
-                                       rank=args.rank,
-                                       world_size=args.world_size)
+        distributed.init_process_group(
+            backend="nccl",
+            init_method=f"tcp://{args.master}",
+            rank=args.rank,
+            world_size=args.world_size,
+        )
 
     checkpoint = args.checkpoints / f"{name}.th"
     checkpoint_tmp = args.checkpoints / f"{name}.th.tmp"
@@ -140,11 +142,7 @@ def main():
     else:
         augment = Shift(args.data_stride)
 
-    if args.mse:
-        criterion = nn.MSELoss()
-    else:
-        criterion = nn.L1Loss()
-
+    criterion = nn.MSELoss() if args.mse else nn.L1Loss()
     # Setting number of samples so that all convolution windows are full.
     # Prevents hard to debug mistake with the prediction being shifted compared
     # to the input mixture.

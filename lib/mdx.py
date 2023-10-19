@@ -128,9 +128,7 @@ class MDXModel:
                 end = None if slice == list(mix.keys())[::-1][0] or self.margin == 0 else -self.margin
                 sources.append(tar_waves[:,start:end]/self.params.compensation)
             chunked_sources.append(sources)
-        sources = np.concatenate(chunked_sources, axis=-1)
-        
-        return sources
+        return np.concatenate(chunked_sources, axis=-1)
 
     def run_model(self, mix, is_ckpt=False, is_match_mix=False):
         

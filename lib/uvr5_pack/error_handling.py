@@ -81,13 +81,14 @@ def error_text(process_method, exception):
     error_message = f'\n\nRaw Error Details:\n\n{message}\nError Time Stamp [{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}]\n'
     process = f'Last Error Received:\n\nProcess: {process_method}\n\n'
 
-    for error_type, full_text in ERROR_MAPPER.items():
-        if error_type in message:
-            final_message = full_text
-            break
-    else:
-        final_message = (CONTACT_DEV) 
-        
+    final_message = next(
+        (
+            full_text
+            for error_type, full_text in ERROR_MAPPER.items()
+            if error_type in message
+        ),
+        CONTACT_DEV,
+    )
     return f"{process}{final_message}{error_message}"
 
 def error_dialouge(exception):
