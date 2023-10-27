@@ -7,28 +7,28 @@ import sys
 from pytube import YouTube
 import streamlit as st
 from lib.infer_pack.text.cleaners import english_cleaners
-from webui import MENU_ITEMS
+from webui import MENU_ITEMS, get_cwd, i18n
 st.set_page_config("RVC Studio",layout="centered",menu_items=MENU_ITEMS)
+
+from webui.audio import SUPPORTED_AUDIO
+from webui.utils import get_index
 
 from tts_cli import STT_MODELS_DIR, stt_checkpoint, load_stt_models
 
-from webui.components import file_uploader_form
+from webui.components import file_downloader, file_uploader_form
 
 
-from webui.downloader import BASE_MODELS, BASE_MODELS_DIR, LLM_MODELS, MDX_MODELS, PRETRAINED_MODELS, RVC_DOWNLOAD_LINK, RVC_MODELS, SONG_DIR, VITS_MODELS, VR_MODELS, download_link_generator, download_file, save_file
+from webui.downloader import BASE_MODELS, BASE_MODELS_DIR, LLM_MODELS, MDX_MODELS, PRETRAINED_MODELS, RVC_DOWNLOAD_LINK, RVC_MODELS, SONG_DIR, VITS_MODELS, VR_MODELS, download_link_generator, save_file, slugify_filepath
 
-CWD = os.getcwd()
-if CWD not in sys.path:
-    sys.path.append(CWD)
+CWD = get_cwd()
 
 from webui.contexts import ProgressBarContext, SessionStateContext
 
-@st.cache_data(show_spinner=False)
 def download_audio_to_buffer(url):
     buffer = BytesIO()
     youtube_video = YouTube(url)
     audio = youtube_video.streams.get_audio_only()
-    default_filename = audio.default_filename
+    default_filename = slugify_filepath(audio.default_filename)
     audio.stream_to_buffer(buffer)
     return default_filename, buffer
 
@@ -39,7 +39,7 @@ def render_download_ffmpeg(lib_name="ffmpeg.exe"):
     if col2.button("Download",disabled=is_downloaded,key=lib_name):
         link = f"{RVC_DOWNLOAD_LINK}ffmpeg.exe"
         with st.spinner(f"Downloading from {link} to {lib_name}"):
-            download_file((lib_name,link))
+            file_downloader((lib_name,link))
             st.experimental_rerun()
 
 def render_model_checkboxes(generator):
@@ -52,7 +52,7 @@ def render_model_checkboxes(generator):
         col2.markdown(f"[Download Link]({link})")
         if col3.button("Download",disabled=is_downloaded,key=model_path):
             with st.spinner(f"Downloading from {link} to {model_path}"):
-                download_file((model_path,link))
+                file_downloader((model_path,link))
                 st.experimental_rerun()
     return not_downloaded
 
@@ -72,7 +72,7 @@ if __name__=="__main__":
             generator = download_link_generator(RVC_DOWNLOAD_LINK, BASE_MODELS)
             to_download = render_model_checkboxes(generator)
             if st.button("Download All",key="download-all-base-models",disabled=len(to_download)==0):
-                with ProgressBarContext(to_download,download_file,"Downloading models") as pb:
+                with ProgressBarContext(to_download,file_downloader,"Downloading models") as pb:
                     pb.run()
 
         st.subheader("Required Models for training")
@@ -80,7 +80,7 @@ if __name__=="__main__":
             generator = download_link_generator(RVC_DOWNLOAD_LINK, PRETRAINED_MODELS)
             to_download = render_model_checkboxes(generator)
             if st.button("Download All",key="download-all-pretrained-models",disabled=len(to_download)==0):
-                with ProgressBarContext(to_download,download_file,"Downloading models") as pb:
+                with ProgressBarContext(to_download,file_downloader,"Downloading models") as pb:
                     pb.run()
         with st.container():
             if platform.system() == "Windows":
@@ -98,18 +98,18 @@ if __name__=="__main__":
             generator = download_link_generator(RVC_DOWNLOAD_LINK, RVC_MODELS)
             to_download = render_model_checkboxes(generator)
             if st.button("Download All",key="download-all-rvc-models",disabled=len(to_download)==0):
-                with ProgressBarContext(to_download,download_file,"Downloading models") as pb:
+                with ProgressBarContext(to_download,file_downloader,"Downloading models") as pb:
                     pb.run()
         with st.expander("Vocal Separation Models"):
             generator = download_link_generator(RVC_DOWNLOAD_LINK, VR_MODELS+MDX_MODELS)
             to_download = render_model_checkboxes(generator)
             if st.button("Download All",key="download-all-vr-models",disabled=len(to_download)==0):
-                with ProgressBarContext(to_download,download_file,"Downloading models") as pb:
+                with ProgressBarContext(to_download,file_downloader,"Downloading models") as pb:
                     pb.run()
         with st.expander("VITS Models"):
             generator = download_link_generator(RVC_DOWNLOAD_LINK, VITS_MODELS)
             to_download = render_model_checkboxes(generator)
-            with ProgressBarContext(to_download,download_file,"Downloading models") as pb:
+            with ProgressBarContext(to_download,file_downloader,"Downloading models") as pb:
                 st.button("Download All",key="download-all-vits-models",disabled=len(to_download)==0,on_click=pb.run)
 
         with st.expander("Chat Models"):
@@ -124,7 +124,7 @@ if __name__=="__main__":
                     st.experimental_rerun()
             generator = [(os.path.join(BASE_MODELS_DIR,"LLM",os.path.basename(link)),link) for link in LLM_MODELS]
             to_download = render_model_checkboxes(generator)
-            with ProgressBarContext(to_download,download_file,"Downloading models") as pb:
+            with ProgressBarContext(to_download,file_downloader,"Downloading models") as pb:
                 st.button("Download All",key="download-all-chat-models",disabled=len(to_download)==0,on_click=pb.run)
 
     with audio_tab, SessionStateContext("youtube_downloader") as state:
@@ -140,11 +140,16 @@ if __name__=="__main__":
             title, data = state.downloaded_audio
             st.subheader("Title")
             st.write(title)
-            fname = Path(title).with_suffix(".flac").name
+            state.format = st.radio(
+                i18n("inference.format"),
+                options=SUPPORTED_AUDIO,horizontal=True,
+                index=get_index(SUPPORTED_AUDIO,state.format))
+            fname = Path(title).with_suffix(f".{state.format}").name
             st.subheader("Listen to Audio")
             st.audio(data, format='audio/mpeg')
             st.subheader("Download Audio File")
+            
             if st.button("Download Song"):
-                params = (english_cleaners(os.path.join(SONG_DIR,fname)).replace(" ","_"),data.read())
-                save_file(params)
-                st.toast(f"File saved to ${params[0]}")
+                data.seek(0)
+                params = (os.path.join(SONG_DIR,fname),data.read())
+                st.toast(save_file(params))

@@ -1,10 +1,10 @@
 from collections import OrderedDict
-import os, sys
+import os
 import traceback
 
-CWD = os.getcwd()
-if CWD not in sys.path:
-    sys.path.append(CWD)
+from webui import get_cwd
+
+CWD = get_cwd()
 
 from lib.train import utils
 import datetime
@@ -53,7 +53,7 @@ from lib.train.mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 global_step = 0
 least_loss = 40
 
-def save_checkpoint(ckpt, sr, if_f0, name, epoch, version, hps, model_path="./models/RVC"):
+def save_checkpoint(ckpt, sr, if_f0, name, epoch, version, hps, model_path=os.path.join(CWD,"models","RVC")):
     try:
         opt = OrderedDict()
         opt["weight"] = {}
@@ -115,25 +115,26 @@ def main():
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(randint(20000, 55555))
     os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128,garbage_collection_threshold:0.8"
-    children = []
-    gpu_list = hps.gpus.split("-") if hps.gpus else range(n_gpus)
-    for i in gpu_list:
+    children = {}
+    gpu_devices = hps.gpus.split("-") if hps.gpus else range(n_gpus)
+    for i, device in enumerate(gpu_devices):
         subproc = mp.Process(
             target=run,
             args=(
                 i,
                 n_gpus,
                 hps,
+                device
             ),
         )
-        children.append(subproc)
+        children[i]=subproc
         subproc.start()
 
-    for i in range(len(gpu_list)):
+    for i in gpu_devices:
         children[i].join()
 
 
-def run(rank, n_gpus, hps):
+def run(rank, n_gpus, hps, device):
     global global_step, least_loss
     if rank == 0:
         logger = utils.get_logger(hps.model_dir)
@@ -141,18 +142,21 @@ def run(rank, n_gpus, hps):
         # utils.check_git_hash(hps.model_dir)
         writer = SummaryWriter(log_dir=hps.model_dir)
         writer_eval = SummaryWriter(log_dir=os.path.join(hps.model_dir, "eval"))
-
+    print(f"line 145: {rank, n_gpus, device}")
     dist.init_process_group(
         backend="gloo", init_method="env://", world_size=n_gpus, rank=rank
     )
+    print(f"line 149: started dist.init_process_group")
     torch.manual_seed(hps.train.seed)
     if torch.cuda.is_available():
-        torch.cuda.set_device(f"cuda:{rank}")
+        torch.cuda.set_device(f"cuda:{device}")
+    print(f"line 153: cuda seed and device set")
 
     if hps.if_f0 == 1:
         train_dataset = TextAudioLoaderMultiNSFsid(hps.data.training_files, hps.data)
     else:
         train_dataset = TextAudioLoader(hps.data.training_files, hps.data)
+    print(f"line 157: {train_dataset}")
     train_sampler = DistributedBucketSampler(
         train_dataset,
         hps.train.batch_size * n_gpus,
@@ -162,6 +166,7 @@ def run(rank, n_gpus, hps):
         rank=rank,
         shuffle=True,
     )
+    print(f"line 167: {train_sampler}")
     # It is possible that dataloader's workers are out of shared memory. Please try to raise your shared memory limit.
     # num_workers=8 -> num_workers=4
     if hps.if_f0 == 1:
@@ -178,6 +183,7 @@ def run(rank, n_gpus, hps):
         persistent_workers=True,
         prefetch_factor=8,
     )
+    print(f"line 184: {train_loader}")
     if hps.if_f0 == 1:
         net_g = RVC_Model_f0(
             hps.data.filter_length // 2 + 1,
@@ -518,7 +524,7 @@ def train_and_evaluate(
                 logger.info(
                     f"loss_disc={loss_disc:.3f}, loss_gen={loss_gen:.3f}, loss_fm={loss_fm:.3f},loss_mel={loss_mel:.3f}, loss_kl={loss_kl:.3f}"
                 )
-                if loss_gen_all<least_loss:
+                if loss_gen_all<int(least_loss):
                     least_loss = loss_gen_all
                     
                     if hasattr(net_g, "module"):
@@ -535,7 +541,7 @@ def train_and_evaluate(
                                 ckpt,
                                 hps.sample_rate,
                                 hps.if_f0,
-                                f"{hps.name}_e{epoch}_loss{loss_gen_all:2.2f}",
+                                f"loss{loss_gen_all:2.0f}_{hps.name}_e{epoch}",
                                 epoch,
                                 hps.version,
                                 hps,

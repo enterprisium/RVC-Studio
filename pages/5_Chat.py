@@ -3,7 +3,7 @@ import json
 import os
 import sys
 import streamlit as st
-from webui import MENU_ITEMS, TTS_MODELS, config, i18n, DEVICE_OPTIONS
+from webui import MENU_ITEMS, TTS_MODELS, config, get_cwd, i18n, DEVICE_OPTIONS
 from webui.chat import init_assistant_template, init_llm_options, init_model_config, init_model_params, Character
 from webui.downloader import OUTPUT_DIR
 st.set_page_config(layout="wide",menu_items=MENU_ITEMS)
@@ -13,34 +13,30 @@ from webui.components import file_uploader_form, initial_voice_conversion_params
 
 import sounddevice as sd
 from lib.model_utils import get_hash
-from tts_cli import generate_speech
-from vc_infer_pipeline import vc_single
 
 from webui.contexts import SessionStateContext
 
 import time
-from types import SimpleNamespace
+from webui.utils import ObjectNamespace
 
 from webui.utils import gc_collect, get_filenames, get_index, get_optimal_torch_device
 
-CWD = os.getcwd()
-if CWD not in sys.path:
-    sys.path.append(CWD)
+CWD = get_cwd()
 
 def get_model_list():
-    models_list =  [os.path.relpath(path,CWD) for path in get_filenames(root="./models",folder="LLM",exts=["bin","gguf"])]
+    models_list =  [os.path.relpath(path,CWD) for path in get_filenames(root=os.path.join(CWD,"models"),folder="LLM",exts=["bin","gguf"])]
     return models_list
 
 def get_voice_list():
-    models_list = [os.path.relpath(path,CWD) for path in get_filenames(root="./models",folder="RVC",exts=["pth"])]
+    models_list = [os.path.relpath(path,CWD) for path in get_filenames(root=os.path.join(CWD,"models"),folder="RVC",exts=["pth"])]
     return models_list
 
 def get_character_list():
-    models_list =  [os.path.relpath(path,CWD) for path in get_filenames(root="./models",folder="RVC/.characters",exts=["json"])]
+    models_list =  [os.path.relpath(path,CWD) for path in get_filenames(root=os.path.join(CWD,"models","RVC"),folder=".characters",exts=["json"])]
     return models_list
 
 def init_state():
-    state = SimpleNamespace(
+    return ObjectNamespace(
         voice_models=get_voice_list(),
         voice_model=None,
         characters=get_character_list(),
@@ -58,7 +54,7 @@ def init_state():
         tts_method=None,
         character=None
     )
-    return vars(state)
+    
 
 def refresh_data(state):
     state.model_list = get_model_list()
@@ -69,8 +65,8 @@ def refresh_data(state):
 def save_character(state):
     with open(os.path.join(CWD,"models","RVC",".characters",f"{state.assistant_template.name}.json"),"w") as f:
         loaded_state = {
-            "assistant_template": vars(state.assistant_template),
-            "tts_options": vars(state.tts_options),
+            "assistant_template": (state.assistant_template),
+            "tts_options": (state.tts_options),
             "voice": state.voice_model,
             "tts_method": state.tts_method
         }
@@ -81,11 +77,11 @@ def save_character(state):
 def load_character(state):
     with open(state.selected_character,"r") as f:
         loaded_state = json.load(f)
-        state.assistant_template = SimpleNamespace(**loaded_state["assistant_template"])
+        state.assistant_template = ObjectNamespace(**loaded_state["assistant_template"])
         
-        state.tts_options = vars(state.tts_options)
+        state.tts_options = (state.tts_options)
         state.tts_options.update(loaded_state["tts_options"])
-        state.tts_options = SimpleNamespace(**state.tts_options)
+        state.tts_options = ObjectNamespace(**state.tts_options)
         state.voice_model = loaded_state["voice"]
         state.tts_method = loaded_state["tts_method"]
     state = refresh_data(state)
@@ -104,9 +100,9 @@ def save_model_config(state):
     with open(fname,"w") as f:
         data[key] = {
             "version": 2,
-            "params": vars(state.model_params),
-            "config": vars(state.model_config),
-            "options": vars(state.llm_options),
+            "params": (state.model_params),
+            "config": (state.model_config),
+            "options": (state.llm_options),
         }
         f.write(json.dumps(data,indent=2))
     state = refresh_data(state)
@@ -121,9 +117,9 @@ def load_model_config(state):
         model_data = data[key] if key in data else {**vars(init_model_config()), **vars(init_model_params()), **vars(init_llm_options())}
 
         if "version" in model_data and model_data["version"]==2:
-            state.model_params = SimpleNamespace(**model_data["params"])
-            state.model_config = SimpleNamespace(**model_data["config"])
-            state.llm_options = SimpleNamespace(**model_data["options"])
+            state.model_params = ObjectNamespace(**model_data["params"])
+            state.model_config = ObjectNamespace(**model_data["config"])
+            state.llm_options = ObjectNamespace(**model_data["options"])
         else: # old version
             state.model_config.prompt_template = model_data["prompt_template"]
             state.model_config.chat_template = model_data["chat_template"]
@@ -312,7 +308,7 @@ if __name__=="__main__":
                     time.sleep(1)
                     st.experimental_rerun()
             elif st.button("Voice Chat (WIP)",type="secondary" ):
-                state.character.speak_and_listen(st)
+                state.character.speak_and_listen()
                 st.experimental_rerun()
             elif st.button("Toggle Autoplay",type="primary" if state.character.autoplay else "secondary" ):
                 state.character.toggle_autoplay()

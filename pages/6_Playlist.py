@@ -4,32 +4,26 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from webui import DEVICE_OPTIONS, MENU_ITEMS, i18n, config
+from webui import DEVICE_OPTIONS, MENU_ITEMS, get_cwd, i18n, config
 from webui.downloader import SONG_DIR
 st.set_page_config(layout="centered",menu_items=MENU_ITEMS)
 
 from webui.components import active_subprocess_list, file_uploader_form, initial_vocal_separation_params, initial_voice_conversion_params, vocal_separation_form, voice_conversion_form
-from webui.utils import gc_collect, get_filenames, get_index, get_optimal_torch_device
+from webui.utils import gc_collect, get_filenames, get_index, get_optimal_torch_device, get_rvc_models
 
 
 from webui.player import PlaylistPlayer
-from types import SimpleNamespace
+from webui.utils import ObjectNamespace
 from webui.contexts import SessionStateContext
 from webui.audio import SUPPORTED_AUDIO
 
-CWD = os.getcwd()
-if CWD not in sys.path:
-    sys.path.append(CWD)
-
-def get_models(folder="."):
-    fnames = get_filenames(root="./models",folder=folder,exts=["pth","pt"])
-    return fnames
+CWD = get_cwd()
 
 def init_inference_state():
-    state = SimpleNamespace(
+    return ObjectNamespace(
         player=None,
         playlist = get_filenames(exts=SUPPORTED_AUDIO,name_filters=[""],folder="songs"),
-        models=get_models(folder="RVC"),
+        models=get_rvc_models(),
         model_name=None,
         
         split_vocal_config=initial_vocal_separation_params(),
@@ -39,12 +33,11 @@ def init_inference_state():
         volume=1.0,
         device=get_optimal_torch_device()
     )
-    return vars(state)
 
 def refresh_data(state):
-    state.split_vocal_config.uvr5_models = get_filenames(root="./models",name_filters=["vocal","instrument"])
-    state.split_vocal_config.uvr5_preprocess_models = get_filenames(root="./models",name_filters=["echo","reverb","noise"])
-    state.models = get_models(folder="RVC")
+    # state.split_vocal_config.uvr5_models = get_filenames(root=os.path.join(CWD,"models"),name_filters=["vocal","instrument"])
+    # state.split_vocal_config.uvr5_preprocess_models = get_filenames(root=os.path.join(CWD,"models"),name_filters=["echo","reverb","noise"])
+    state.models = get_rvc_models()
     state.playlist = get_filenames(exts=SUPPORTED_AUDIO,name_filters=[""],folder="songs")
     gc_collect()
     return state
@@ -55,7 +48,7 @@ def render_vocal_separation_form(state):
         
         if st.form_submit_button(i18n("inference.save.button"),type="primary"):
             state.split_vocal_config = split_vocal_config
-            update_player_args(split_audio_params=vars(state.split_vocal_config))
+            update_player_args(split_audio_params=(state.split_vocal_config))
     return state
 
 def render_vocal_conversion_form(state):
@@ -64,7 +57,7 @@ def render_vocal_conversion_form(state):
         
         if st.form_submit_button(i18n("inference.save.button"),type="primary"):
             state.vocal_change_config = vocal_change_config
-            update_player_args(vc_single_params=vars(state.vocal_change_config))
+            update_player_args(vc_single_params=(state.vocal_change_config))
     return state
 
 def set_volume(state):
@@ -131,8 +124,8 @@ if __name__=="__main__":
                                                 model_name=state.model_name,
                                                 config=config,
                                                 device=state.device,
-                                                split_audio_params=vars(state.split_vocal_config),
-                                                vc_single_params=vars(state.vocal_change_config))
+                                                split_audio_params=(state.split_vocal_config),
+                                                vc_single_params=(state.vocal_change_config))
             else:
                 if state.player.paused:
                     state.player.resume()

@@ -1,4 +1,6 @@
+import re
 from typing import IO, List, Tuple
+import unicodedata
 import requests
 import os
 import zipfile
@@ -25,12 +27,17 @@ VITS_MODELS = ["VITS/pretrained_ljs.pth"]
 PRETRAINED_MODELS = [
     "pretrained_v2/D48k.pth",
     "pretrained_v2/G48k.pth",
+    "pretrained_v2/D32k.pth",
+    "pretrained_v2/G32k.pth",
     "pretrained_v2/D40k.pth",
     "pretrained_v2/G40k.pth",
     "pretrained_v2/f0D48k.pth",
     "pretrained_v2/f0G48k.pth",
     "pretrained_v2/f0D40k.pth",
-    "pretrained_v2/f0G40k.pth"]
+    "pretrained_v2/f0G40k.pth",
+    "pretrained_v2/f0D32k.pth",
+    "pretrained_v2/f0G32k.pth"
+]
 LLM_MODELS = [
     "https://huggingface.co/TheBloke/Airoboros-L2-7B-2.1-GGUF/resolve/main/airoboros-l2-7b-2.1.Q4_K_M.gguf",
     "https://huggingface.co/TheBloke/Pygmalion-2-7B-GGUF/resolve/main/pygmalion-2-7b.Q4_K_M.gguf",
@@ -58,10 +65,14 @@ def download_link_generator(download_link: str,model_list: List[str]):
 
 def save_file(params: Tuple[str, any]):
     (data_path, datum) = params
-    if "zip" in os.path.splitext(data_path)[-1]: save_zipped_files(params) # unzip
-    else: 
-        with open(data_path,"wb") as f:
-            f.write(datum)
+    if "zip" in os.path.splitext(data_path)[-1]: return save_zipped_files(params) # unzip
+    else:
+        try:
+            with open(data_path,"wb") as f:
+                f.write(datum)
+            return f"Successfully saved file to: {data_path}"
+        except Exception as e:
+            return f"Failed to save file: {e}"
 
 def save_file_generator(save_dir: str, data: List[IO]):
     for datum in data:
@@ -71,18 +82,36 @@ def save_file_generator(save_dir: str, data: List[IO]):
 def save_zipped_files(params: Tuple[str, any]):
     (data_path, datum) = params
 
-    print(f"saving zip file: {data_path}")
-    temp_dir = os.path.join(BASE_CACHE_DIR,"zips")
-    os.makedirs(temp_dir,exist_ok=True)
-    name = os.path.basename(data_path)
-    zip_path = os.path.join(temp_dir,name)
+    try:
+        print(f"saving zip file: {data_path}")
+        temp_dir = os.path.join(BASE_CACHE_DIR,"zips")
+        os.makedirs(temp_dir,exist_ok=True)
+        name = os.path.basename(data_path)
+        zip_path = os.path.join(temp_dir,name)
 
-    with open(zip_path,"wb") as f:
-        f.write(datum)
+        with open(zip_path,"wb") as f:
+            f.write(datum)
 
-    print(f"extracting zip file: {zip_path}")
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(os.path.dirname(data_path))
-    print(f"finished extracting zip file")
+        print(f"extracting zip file: {zip_path}")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(os.path.dirname(data_path))
+        print(f"finished extracting zip file")
+        
+        os.remove(zip_path) # cleanup
+        return f"Successfully saved files to: {data_path}"
+    except Exception as e:
+        return f"Failed to save files: {e}"
     
-    os.remove(zip_path) # cleanup
+def slugify_filepath(filepath):
+    # Split the path into directory and filename
+    directory, filename = os.path.split(filepath)
+    # Normalize the filename
+    filename = unicodedata.normalize('NFKD', filename)
+    # Encode the filename as ASCII and ignore errors
+    filename = filename.encode('ascii', 'ignore').decode()
+    # Convert the filename to lowercase
+    filename = filename.lower()
+    # Replace spaces and other unwanted characters with dashes
+    filename = re.sub(r'[^a-z0-9.-]+', '-', filename)
+    # Join the directory and the slugified filename
+    return os.path.join(directory, filename)
